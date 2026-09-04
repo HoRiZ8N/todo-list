@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Todo List</title>
+  <link rel="stylesheet" href="styles/style.css" />
+</head>
+<body>
+  <main>
+    <h1>Todo List</h1>
+
+    <section id="auth-section">
+      <form id="login-form">
+        <input id="email" type="email" placeholder="Email" required />
+        <input id="password" type="password" placeholder="Пароль" required />
+        <button type="submit">Войти</button>
+        <button type="button" id="register-btn">Зарегистрироваться</button>
+      </form>
+      <p id="auth-error" class="error"></p>
+    </section>
+
+    <section id="app-section" class="hidden">
+      <div class="header">
+        <span>Роль: <strong id="role-label"></strong></span>
+        <button id="logout-btn">Выйти</button>
+      </div>
+
+      <form id="todo-form">
+        <input id="title" type="text" placeholder="Новая задача" required />
+        <button type="submit">Добавить</button>
+      </form>
+
+      <ul id="todo-list"></ul>
+    </section>
+  </main>
+
+  <script type="module" src="dist/main.js"></script>
+</body>
+</html>
