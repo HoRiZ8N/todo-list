@@ -6,6 +6,8 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__Default=Data Source=/data/todo.db
+      - Admin__Email=admin@todo.local
+      - Admin__Password=Admin123!
     volumes:
       - todo-data:/data
 

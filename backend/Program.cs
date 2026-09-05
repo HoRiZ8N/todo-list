@@ -77,6 +77,28 @@ using (var scope = app.Services.CreateScope())
         if (!await roleManager.RoleExistsAsync(role))
             await roleManager.CreateAsync(new IdentityRole(role));
     }
+
+    // Сидинг первого администратора из переменных окружения (если заданы)
+    var adminEmail = builder.Configuration["Admin:Email"];
+    var adminPassword = builder.Configuration["Admin:Password"];
+    if (!string.IsNullOrWhiteSpace(adminEmail) && !string.IsNullOrWhiteSpace(adminPassword))
+    {
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+        var existingAdmin = await userManager.FindByEmailAsync(adminEmail);
+
+        if (existingAdmin is null)
+        {
+            var admin = new AppUser { UserName = adminEmail, Email = adminEmail, EmailConfirmed = true };
+            var result = await userManager.CreateAsync(admin, adminPassword);
+            if (result.Succeeded)
+                await userManager.AddToRoleAsync(admin, Roles.Admin);
+        }
+        else if (!await userManager.IsInRoleAsync(existingAdmin, Roles.Admin))
+        {
+            // Пользователь с таким email уже есть, но не админ — повышаем
+            await userManager.AddToRoleAsync(existingAdmin, Roles.Admin);
+        }
+    }
 }
 
 if (app.Environment.IsDevelopment())
