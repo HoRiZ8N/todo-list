@@ -73,3 +73,20 @@ li button {
 }
 
 .error { color: #b3261e; font-size: 13px; }
+
+.hints {
+  list-style: none;
+  padding: 0;
+  margin: -4px 0 4px;
+  font-size: 12px;
+  color: #999;
+  width: 100%;
+}
+
+.hints li {
+  border: none;
+  padding: 1px 0;
+}
+
+.hints li.ok { color: #0f6e56; }
+.hints li.bad { color: #b3261e; }

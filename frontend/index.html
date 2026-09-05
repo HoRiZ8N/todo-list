@@ -12,7 +12,12 @@
     <section id="auth-section">
       <form id="login-form">
         <input id="email" type="email" placeholder="Email" required />
-        <input id="password" type="password" placeholder="Пароль" required />
+        <input id="password" type="password" placeholder="Пароль" required minlength="6" />
+        <input id="password-confirm" type="password" placeholder="Повторите пароль (для регистрации)" />
+        <ul id="password-hints" class="hints">
+          <li id="hint-length">Минимум 6 символов</li>
+          <li id="hint-match">Пароли совпадают</li>
+        </ul>
         <button type="submit">Войти</button>
         <button type="button" id="register-btn">Зарегистрироваться</button>
       </form>
