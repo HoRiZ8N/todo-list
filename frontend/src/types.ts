@@ -12,6 +12,13 @@ export interface Todo {
   userId: string;
 }
 
+export interface AdminUser {
+  id: string;
+  email: string;
+  role: string;
+  isBanned: boolean;
+}
+
 export interface AuthResponse {
   token: string;
   email: string;

@@ -43,6 +43,9 @@ public class AuthController : ControllerBase
         if (user is null || !await _userManager.CheckPasswordAsync(user, dto.Password))
             return Unauthorized("Неверный email или пароль");
 
+        if (user.IsBanned)
+            return StatusCode(403, "Аккаунт заблокирован администратором");
+
         var roles = await _userManager.GetRolesAsync(user);
         var token = _jwt.GenerateToken(user, roles);
 

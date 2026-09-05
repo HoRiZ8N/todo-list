@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -21,10 +22,18 @@ public class AdminController : ControllerBase
         _db = db;
     }
 
+    private string CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier)
+        ?? User.FindFirstValue("sub")!;
+
     [HttpGet("users")]
-    public IActionResult GetAllUsers()
+    public async Task<IActionResult> GetAllUsers()
     {
-        var users = _userManager.Users.Select(u => new { u.Id, u.Email }).ToList();
+        var users = new List<AdminUserDto>();
+        foreach (var u in _userManager.Users.ToList())
+        {
+            var roles = await _userManager.GetRolesAsync(u);
+            users.Add(new AdminUserDto(u.Id, u.Email ?? "", roles.FirstOrDefault() ?? Roles.User, u.IsBanned));
+        }
         return Ok(users);
     }
 
@@ -34,9 +43,37 @@ public class AdminController : ControllerBase
         return Ok(await _db.Todos.ToListAsync());
     }
 
+    [HttpPost("users/{id}/ban")]
+    public async Task<IActionResult> BanUser(string id)
+    {
+        if (id == CurrentUserId)
+            return BadRequest("Нельзя заблокировать самого себя");
+
+        var user = await _userManager.FindByIdAsync(id);
+        if (user is null) return NotFound();
+
+        user.IsBanned = true;
+        await _userManager.UpdateAsync(user);
+        return NoContent();
+    }
+
+    [HttpPost("users/{id}/unban")]
+    public async Task<IActionResult> UnbanUser(string id)
+    {
+        var user = await _userManager.FindByIdAsync(id);
+        if (user is null) return NotFound();
+
+        user.IsBanned = false;
+        await _userManager.UpdateAsync(user);
+        return NoContent();
+    }
+
     [HttpDelete("users/{id}")]
     public async Task<IActionResult> DeleteUser(string id)
     {
+        if (id == CurrentUserId)
+            return BadRequest("Нельзя удалить самого себя");
+
         var user = await _userManager.FindByIdAsync(id);
         if (user is null) return NotFound();
 

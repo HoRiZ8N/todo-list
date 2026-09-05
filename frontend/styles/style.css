@@ -136,3 +136,48 @@ li {
 .badge.prio-low { background: #E1F5EE; color: #0F6E56; }
 .badge.prio-medium { background: #FAEEDA; color: #854F0B; }
 .badge.prio-high { background: #FCEBEB; color: #B3261E; }
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.tab {
+  background: none;
+  color: #666;
+  border-radius: 6px 6px 0 0;
+  padding: 8px 14px;
+}
+
+.tab.active {
+  background: #E1F5EE;
+  color: #0f6e56;
+  font-weight: 600;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th, td {
+  text-align: left;
+  padding: 8px 6px;
+  border-bottom: 1px solid #eee;
+}
+
+th { color: #999; font-weight: 500; font-size: 12px; }
+
+.status-active { color: #0f6e56; }
+.status-banned { color: #b3261e; font-weight: 600; }
+
+td button {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+td button.unban { background: #0f6e56; }
+td button.ban { background: #b3261e; }

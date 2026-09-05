@@ -1,5 +1,8 @@
-import type { Todo, Priority } from "./types.js";
-import { login, register, getTodos, createTodo, updateTodo, deleteTodo } from "./api.js";
+import type { Todo, Priority, AdminUser } from "./types.js";
+import {
+  login, register, getTodos, createTodo, updateTodo, deleteTodo,
+  getUsers, banUser, unbanUser,
+} from "./api.js";
 
 const authSection = document.getElementById("auth-section")!;
 const appSection = document.getElementById("app-section")!;
@@ -49,10 +52,98 @@ const logoutBtn = document.getElementById("logout-btn")!;
 const PRIORITY_LABELS: Record<Priority, string> = { 0: "Низкий", 1: "Средний", 2: "Высокий" };
 const PRIORITY_CLASS: Record<Priority, string> = { 0: "prio-low", 1: "prio-medium", 2: "prio-high" };
 
-function showApp(role: string) {
+const tabs = document.getElementById("tabs")!;
+const tabTodos = document.getElementById("tab-todos")!;
+const tabUsers = document.getElementById("tab-users")!;
+const todosTab = document.getElementById("todos-tab")!;
+const usersTab = document.getElementById("users-tab")!;
+const usersTbody = document.getElementById("users-tbody")!;
+
+let currentUserId: string | null = null;
+
+function parseUserIdFromToken(token: string): string | null {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.sub ?? payload.nameid ?? null;
+  } catch {
+    return null;
+  }
+}
+
+tabTodos.addEventListener("click", () => switchTab("todos"));
+tabUsers.addEventListener("click", () => switchTab("users"));
+
+function switchTab(tab: "todos" | "users") {
+  tabTodos.classList.toggle("active", tab === "todos");
+  tabUsers.classList.toggle("active", tab === "users");
+  todosTab.classList.toggle("hidden", tab !== "todos");
+  usersTab.classList.toggle("hidden", tab !== "users");
+  if (tab === "users") void loadUsers();
+}
+
+async function loadUsers() {
+  usersTbody.innerHTML = `<tr><td colspan="4">Загрузка...</td></tr>`;
+  try {
+    const users = await getUsers();
+    renderUsers(users);
+  } catch (e) {
+    usersTbody.innerHTML = `<tr><td colspan="4" class="error">${(e as Error).message}</td></tr>`;
+  }
+}
+
+function renderUsers(users: AdminUser[]) {
+  usersTbody.innerHTML = "";
+  for (const u of users) {
+    const tr = document.createElement("tr");
+
+    const emailTd = document.createElement("td");
+    emailTd.textContent = u.email;
+
+    const roleTd = document.createElement("td");
+    roleTd.textContent = u.role === "Admin" ? "Администратор" : "Пользователь";
+
+    const statusTd = document.createElement("td");
+    statusTd.textContent = u.isBanned ? "Заблокирован" : "Активен";
+    statusTd.className = u.isBanned ? "status-banned" : "status-active";
+
+    const actionTd = document.createElement("td");
+    if (u.id !== currentUserId) {
+      const btn = document.createElement("button");
+      btn.textContent = u.isBanned ? "Разбанить" : "Забанить";
+      btn.className = u.isBanned ? "unban" : "ban";
+      btn.onclick = async () => {
+        try {
+          if (u.isBanned) await unbanUser(u.id);
+          else await banUser(u.id);
+          void loadUsers();
+        } catch (e) {
+          alert((e as Error).message);
+        }
+      };
+      actionTd.appendChild(btn);
+    } else {
+      actionTd.textContent = "— это вы";
+    }
+
+    tr.append(emailTd, roleTd, statusTd, actionTd);
+    usersTbody.appendChild(tr);
+  }
+}
+
+function showApp(role: string, token: string) {
   authSection.classList.add("hidden");
   appSection.classList.remove("hidden");
   roleLabel.textContent = role === "Admin" ? "Администратор" : "Пользователь";
+  currentUserId = parseUserIdFromToken(token);
+
+  if (role === "Admin") {
+    tabs.classList.remove("hidden");
+  } else {
+    tabs.classList.add("hidden");
+    todosTab.classList.remove("hidden");
+    usersTab.classList.add("hidden");
+  }
+
   void loadTodos();
 }
 
@@ -135,7 +226,8 @@ loginForm.addEventListener("submit", async (e) => {
   try {
     const res = await login(emailInput.value, passwordInput.value);
     localStorage.setItem("token", res.token);
-    showApp(res.role);
+    localStorage.setItem("role", res.role);
+    showApp(res.role, res.token);
   } catch (err) {
     authError.textContent = (err as Error).message;
   }
@@ -153,7 +245,8 @@ registerBtn.addEventListener("click", async () => {
   try {
     const res = await register(emailInput.value, passwordInput.value);
     localStorage.setItem("token", res.token);
-    showApp(res.role);
+    localStorage.setItem("role", res.role);
+    showApp(res.role, res.token);
   } catch (err) {
     authError.textContent = (err as Error).message;
   }
@@ -181,11 +274,13 @@ filterClearBtn.addEventListener("click", () => {
 
 logoutBtn.addEventListener("click", () => {
   localStorage.removeItem("token");
+  localStorage.removeItem("role");
   appSection.classList.add("hidden");
   authSection.classList.remove("hidden");
 });
 
-// Если токен уже есть — сразу показать приложение
-if (localStorage.getItem("token")) {
-  showApp("User");
+// Если токен уже есть — сразу показать приложение с сохранённой ролью
+const savedToken = localStorage.getItem("token");
+if (savedToken) {
+  showApp(localStorage.getItem("role") ?? "User", savedToken);
 }

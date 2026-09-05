@@ -1,4 +1,4 @@
-import type { Todo, AuthResponse, Priority } from "./types.js";
+import type { Todo, AuthResponse, Priority, AdminUser } from "./types.js";
 
 const API_BASE = "http://localhost:5001/api";
 
@@ -65,4 +65,26 @@ export async function deleteTodo(id: string): Promise<void> {
     headers: authHeaders(),
   });
   if (!res.ok) throw new Error("Не удалось удалить задачу");
+}
+
+export async function getUsers(): Promise<AdminUser[]> {
+  const res = await fetch(`${API_BASE}/admin/users`, { headers: authHeaders() });
+  if (!res.ok) throw new Error("Не удалось загрузить пользователей");
+  return res.json();
+}
+
+export async function banUser(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/admin/users/${id}/ban`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error((await res.text()) || "Не удалось заблокировать пользователя");
+}
+
+export async function unbanUser(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/admin/users/${id}/unban`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error((await res.text()) || "Не удалось разблокировать пользователя");
 }

@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -109,6 +110,36 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors();
 app.UseAuthentication();
+
+// Проверка бана на живом токене: даже если JWT ещё не истёк,
+// забаненный пользователь не сможет делать запросы.
+app.Use(async (context, next) =>
+{
+    if (context.User.Identity?.IsAuthenticated == true)
+    {
+        var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? context.User.FindFirstValue("sub");
+
+        if (userId is not null)
+        {
+            var db = context.RequestServices.GetRequiredService<AppDbContext>();
+            var isBanned = await db.Users
+                .Where(u => u.Id == userId)
+                .Select(u => u.IsBanned)
+                .FirstOrDefaultAsync();
+
+            if (isBanned)
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                await context.Response.WriteAsync("Аккаунт заблокирован администратором");
+                return;
+            }
+        }
+    }
+
+    await next();
+});
+
 app.UseAuthorization();
 app.MapControllers();
 
