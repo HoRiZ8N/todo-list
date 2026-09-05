@@ -1,4 +1,4 @@
-import type { Todo } from "./types.js";
+import type { Todo, Priority } from "./types.js";
 import { login, register, getTodos, createTodo, updateTodo, deleteTodo } from "./api.js";
 
 const authSection = document.getElementById("auth-section")!;
@@ -37,9 +37,17 @@ passwordConfirmInput.addEventListener("input", () => validatePassword(true));
 
 const todoForm = document.getElementById("todo-form") as HTMLFormElement;
 const titleInput = document.getElementById("title") as HTMLInputElement;
+const categoryInput = document.getElementById("category") as HTMLInputElement;
+const priorityInput = document.getElementById("priority") as HTMLSelectElement;
+const categoryFilterInput = document.getElementById("category-filter") as HTMLInputElement;
+const filterBtn = document.getElementById("filter-btn")!;
+const filterClearBtn = document.getElementById("filter-clear-btn")!;
 const todoList = document.getElementById("todo-list")!;
 const roleLabel = document.getElementById("role-label")!;
 const logoutBtn = document.getElementById("logout-btn")!;
+
+const PRIORITY_LABELS: Record<Priority, string> = { 0: "Низкий", 1: "Средний", 2: "Высокий" };
+const PRIORITY_CLASS: Record<Priority, string> = { 0: "prio-low", 1: "prio-medium", 2: "prio-high" };
 
 function showApp(role: string) {
   authSection.classList.add("hidden");
@@ -51,7 +59,8 @@ function showApp(role: string) {
 async function loadTodos() {
   todoList.innerHTML = "<li>Загрузка...</li>";
   try {
-    const todos = await getTodos();
+    const category = categoryFilterInput.value.trim() || undefined;
+    const todos = await getTodos(category);
     renderTodos(todos);
   } catch (e) {
     todoList.innerHTML = `<li class="error">${(e as Error).message}</li>`;
@@ -60,6 +69,11 @@ async function loadTodos() {
 
 function renderTodos(todos: Todo[]) {
   todoList.innerHTML = "";
+  if (todos.length === 0) {
+    todoList.innerHTML = "<li>Задач нет</li>";
+    return;
+  }
+
   for (const todo of todos) {
     const li = document.createElement("li");
     li.className = todo.isDone ? "done" : "";
@@ -72,8 +86,29 @@ function renderTodos(todos: Todo[]) {
       void loadTodos();
     };
 
+    const info = document.createElement("div");
+    info.className = "todo-info";
+
+    const titleRow = document.createElement("div");
+    titleRow.className = "todo-title-row";
+
     const span = document.createElement("span");
     span.textContent = todo.title;
+    titleRow.appendChild(span);
+
+    const prioBadge = document.createElement("span");
+    prioBadge.className = `badge ${PRIORITY_CLASS[todo.priority]}`;
+    prioBadge.textContent = PRIORITY_LABELS[todo.priority];
+    titleRow.appendChild(prioBadge);
+
+    info.appendChild(titleRow);
+
+    if (todo.category) {
+      const catBadge = document.createElement("span");
+      catBadge.className = "badge category";
+      catBadge.textContent = todo.category;
+      info.appendChild(catBadge);
+    }
 
     const delBtn = document.createElement("button");
     delBtn.textContent = "Удалить";
@@ -82,7 +117,7 @@ function renderTodos(todos: Todo[]) {
       void loadTodos();
     };
 
-    li.append(checkbox, span, delBtn);
+    li.append(checkbox, info, delBtn);
     todoList.appendChild(li);
   }
 }
@@ -127,8 +162,20 @@ registerBtn.addEventListener("click", async () => {
 todoForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!titleInput.value.trim()) return;
-  await createTodo(titleInput.value.trim());
+
+  const priority = Number(priorityInput.value) as Priority;
+  const category = categoryInput.value.trim() || undefined;
+
+  await createTodo(titleInput.value.trim(), undefined, category, priority);
   titleInput.value = "";
+  categoryInput.value = "";
+  priorityInput.value = "1";
+  void loadTodos();
+});
+
+filterBtn.addEventListener("click", () => void loadTodos());
+filterClearBtn.addEventListener("click", () => {
+  categoryFilterInput.value = "";
   void loadTodos();
 });
 

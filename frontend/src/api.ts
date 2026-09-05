@@ -1,4 +1,4 @@
-import type { Todo, AuthResponse } from "./types.js";
+import type { Todo, AuthResponse, Priority } from "./types.js";
 
 const API_BASE = "http://localhost:5001/api";
 
@@ -27,17 +27,23 @@ export async function register(email: string, password: string): Promise<AuthRes
   return res.json();
 }
 
-export async function getTodos(): Promise<Todo[]> {
-  const res = await fetch(`${API_BASE}/todos`, { headers: authHeaders() });
+export async function getTodos(category?: string): Promise<Todo[]> {
+  const url = category ? `${API_BASE}/todos?category=${encodeURIComponent(category)}` : `${API_BASE}/todos`;
+  const res = await fetch(url, { headers: authHeaders() });
   if (!res.ok) throw new Error("Не удалось загрузить задачи");
   return res.json();
 }
 
-export async function createTodo(title: string, description?: string): Promise<Todo> {
+export async function createTodo(
+  title: string,
+  description: string | undefined,
+  category: string | undefined,
+  priority: Priority
+): Promise<Todo> {
   const res = await fetch(`${API_BASE}/todos`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ title, description }),
+    body: JSON.stringify({ title, description, category, priority }),
   });
   if (!res.ok) throw new Error("Не удалось создать задачу");
   return res.json();

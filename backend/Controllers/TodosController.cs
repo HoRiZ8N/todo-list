@@ -25,10 +25,17 @@ public class TodosController : ControllerBase
     private bool IsAdmin => User.IsInRole(Roles.Admin);
 
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] string? category = null)
     {
         var query = IsAdmin ? _db.Todos : _db.Todos.Where(t => t.UserId == CurrentUserId);
-        return Ok(await query.OrderByDescending(t => t.CreatedAt).ToListAsync());
+
+        if (!string.IsNullOrWhiteSpace(category))
+            query = query.Where(t => t.Category == category);
+
+        return Ok(await query
+            .OrderByDescending(t => t.Priority)
+            .ThenByDescending(t => t.CreatedAt)
+            .ToListAsync());
     }
 
     [HttpGet("{id}")]
@@ -48,6 +55,8 @@ public class TodosController : ControllerBase
             Title = dto.Title,
             Description = dto.Description,
             DueDate = dto.DueDate,
+            Category = dto.Category,
+            Priority = dto.Priority,
             UserId = CurrentUserId
         };
         _db.Todos.Add(todo);
@@ -66,6 +75,8 @@ public class TodosController : ControllerBase
         todo.Description = dto.Description;
         todo.IsDone = dto.IsDone;
         todo.DueDate = dto.DueDate;
+        todo.Category = dto.Category;
+        todo.Priority = dto.Priority;
 
         await _db.SaveChangesAsync();
         return Ok(todo);

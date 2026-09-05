@@ -1,0 +1,45 @@
+# ===== .NET / C# (backend) =====
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# SQLite базы данных (генерируются при запуске)
+*.db
+*.db-shm
+*.db-wal
+
+# EF Core
+backend/Migrations/*.Designer.cs.bak
+
+# ===== Node / TypeScript (frontend) =====
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json.bak
+
+# ===== Docker =====
+*.env
+.env
+.env.local
+
+# ===== IDE =====
+.vs/
+.vscode/
+*.swp
+*.swo
+.idea/
+*.iml
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== Логи =====
+*.log
+logs/

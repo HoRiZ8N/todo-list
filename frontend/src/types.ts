@@ -1,3 +1,5 @@
+export type Priority = 0 | 1 | 2; // Low | Medium | High
+
 export interface Todo {
   id: string;
   title: string;
@@ -5,6 +7,8 @@ export interface Todo {
   isDone: boolean;
   createdAt: string;
   dueDate?: string;
+  category?: string;
+  priority: Priority;
   userId: string;
 }
 

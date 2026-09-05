@@ -32,8 +32,20 @@
 
       <form id="todo-form">
         <input id="title" type="text" placeholder="Новая задача" required />
+        <input id="category" type="text" placeholder="Категория (необязательно)" />
+        <select id="priority">
+          <option value="0">Низкий приоритет</option>
+          <option value="1" selected>Средний приоритет</option>
+          <option value="2">Высокий приоритет</option>
+        </select>
         <button type="submit">Добавить</button>
       </form>
+
+      <div class="filter-row">
+        <input id="category-filter" type="text" placeholder="Фильтр по категории" />
+        <button type="button" id="filter-btn">Фильтровать</button>
+        <button type="button" id="filter-clear-btn">Сбросить</button>
+      </div>
 
       <ul id="todo-list"></ul>
     </section>
