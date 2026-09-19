@@ -6,7 +6,7 @@ obj/
 *.userosscache
 *.sln.docstates
 
-# SQLite базы данных (генерируются при запуске)
+# SQLite databases (generated at runtime)
 *.db
 *.db-shm
 *.db-wal
@@ -40,6 +40,6 @@ package-lock.json.bak
 Thumbs.db
 desktop.ini
 
-# ===== Логи =====
+# ===== Logs =====
 *.log
 logs/

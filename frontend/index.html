@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>Todo List</title>
@@ -12,45 +12,48 @@
     <section id="auth-section">
       <form id="login-form">
         <input id="email" type="email" placeholder="Email" required />
-        <input id="password" type="password" placeholder="Пароль" required minlength="6" />
-        <input id="password-confirm" type="password" placeholder="Повторите пароль (для регистрации)" />
+        <input id="password" type="password" placeholder="Password" required minlength="6" />
+        <input id="password-confirm" type="password" placeholder="Repeat password (for sign up)" />
         <ul id="password-hints" class="hints">
-          <li id="hint-length">Минимум 6 символов</li>
-          <li id="hint-match">Пароли совпадают</li>
+          <li id="hint-length">At least 6 characters</li>
+          <li id="hint-digit">At least one digit (0-9)</li>
+          <li id="hint-lower">Lowercase letter (a-z)</li>
+          <li id="hint-upper">Uppercase letter (A-Z)</li>
+          <li id="hint-match">Passwords match</li>
         </ul>
-        <button type="submit">Войти</button>
-        <button type="button" id="register-btn">Зарегистрироваться</button>
+        <button type="submit">Log in</button>
+        <button type="button" id="register-btn">Sign up</button>
       </form>
-      <p id="auth-error" class="error"></p>
+      <div id="auth-error" class="error"></div>
     </section>
 
     <section id="app-section" class="hidden">
       <div class="header">
-        <span>Роль: <strong id="role-label"></strong></span>
-        <button id="logout-btn">Выйти</button>
+        <span>Role: <strong id="role-label"></strong></span>
+        <button id="logout-btn">Log out</button>
       </div>
 
       <div id="tabs" class="tabs hidden">
-        <button type="button" id="tab-todos" class="tab active">Задачи</button>
-        <button type="button" id="tab-users" class="tab">Пользователи</button>
+        <button type="button" id="tab-todos" class="tab active">Tasks</button>
+        <button type="button" id="tab-users" class="tab">Users</button>
       </div>
 
       <div id="todos-tab">
         <div class="filter-row">
-          <input id="category-filter" type="text" placeholder="Фильтр по категории" />
-          <button type="button" id="filter-btn">Фильтровать</button>
-          <button type="button" id="filter-clear-btn">Сбросить</button>
+          <input id="category-filter" type="text" placeholder="Filter by category" />
+          <button type="button" id="filter-btn">Filter</button>
+          <button type="button" id="filter-clear-btn">Reset</button>
         </div>
 
         <div class="calendar">
           <div class="calendar-nav">
-            <button type="button" id="prev-month" class="nav-btn" aria-label="Предыдущий месяц">&lsaquo;</button>
+            <button type="button" id="prev-month" class="nav-btn" aria-label="Previous month">&lsaquo;</button>
             <span id="month-label" class="month-label"></span>
-            <button type="button" id="next-month" class="nav-btn" aria-label="Следующий месяц">&rsaquo;</button>
-            <button type="button" id="today-btn" class="today-btn">Сегодня</button>
+            <button type="button" id="next-month" class="nav-btn" aria-label="Next month">&rsaquo;</button>
+            <button type="button" id="today-btn" class="today-btn">Today</button>
           </div>
           <div class="calendar-weekdays">
-            <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
+            <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
           </div>
           <div id="calendar-grid" class="calendar-grid"></div>
         </div>
@@ -59,14 +62,14 @@
           <h2 id="day-title" class="day-title"></h2>
 
           <form id="todo-form">
-            <input id="title" type="text" placeholder="Новая задача на этот день" required />
-            <input id="category" type="text" placeholder="Категория (необязательно)" />
+            <input id="title" type="text" placeholder="New task for this day" required />
+            <input id="category" type="text" placeholder="Category (optional)" />
             <select id="priority">
-              <option value="0">Низкий приоритет</option>
-              <option value="1" selected>Средний приоритет</option>
-              <option value="2">Высокий приоритет</option>
+              <option value="0">Low priority</option>
+              <option value="1" selected>Medium priority</option>
+              <option value="2">High priority</option>
             </select>
-            <button type="submit">Добавить</button>
+            <button type="submit">Add</button>
           </form>
 
           <ul id="todo-list"></ul>
@@ -78,8 +81,8 @@
           <thead>
             <tr>
               <th>Email</th>
-              <th>Роль</th>
-              <th>Статус</th>
+              <th>Role</th>
+              <th>Status</th>
               <th></th>
             </tr>
           </thead>

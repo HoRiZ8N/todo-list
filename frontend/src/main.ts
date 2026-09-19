@@ -2,6 +2,7 @@ import type { Todo, Priority, AdminUser } from "./types.js";
 import {
   login, register, getTodos, createTodo, updateTodo, deleteTodo,
   getUsers, banUser, unbanUser,
+  ApiError,
 } from "./api.js";
 
 const authSection = document.getElementById("auth-section")!;
@@ -17,22 +18,64 @@ const authError = document.getElementById("auth-error")!;
 
 const MIN_PASSWORD_LENGTH = 6;
 
+interface PasswordRule {
+  hint: HTMLElement;
+  test: (password: string) => boolean;
+  message: string;
+}
+
+const lengthRule: PasswordRule = {
+  hint: hintLength,
+  test: (p) => p.length >= MIN_PASSWORD_LENGTH,
+  message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters long`,
+};
+
+const PASSWORD_RULES: PasswordRule[] = [
+  lengthRule,
+  { hint: document.getElementById("hint-digit")!, test: (p) => /[0-9]/.test(p), message: "Password must contain a digit" },
+  { hint: document.getElementById("hint-lower")!, test: (p) => /[a-z]/.test(p), message: "Password must contain a lowercase letter (a-z)" },
+  { hint: document.getElementById("hint-upper")!, test: (p) => /[A-Z]/.test(p), message: "Password must contain an uppercase letter (A-Z)" },
+];
+
 function validatePassword(forRegister: boolean): string | null {
   const password = passwordInput.value;
 
-  const lengthOk = password.length >= MIN_PASSWORD_LENGTH;
-  hintLength.classList.toggle("ok", lengthOk);
-  hintLength.classList.toggle("bad", !lengthOk && password.length > 0);
+  for (const rule of PASSWORD_RULES) {
+    const ok = rule.test(password);
+    rule.hint.classList.toggle("ok", ok);
+    rule.hint.classList.toggle("bad", !ok && password.length > 0);
+  }
 
-  if (!forRegister) return lengthOk ? null : `Пароль должен быть не короче ${MIN_PASSWORD_LENGTH} символов`;
+  if (!forRegister) return lengthRule.test(password) ? null : lengthRule.message;
 
   const matchOk = password.length > 0 && password === passwordConfirmInput.value;
   hintMatch.classList.toggle("ok", matchOk);
   hintMatch.classList.toggle("bad", !matchOk && passwordConfirmInput.value.length > 0);
 
-  if (!lengthOk) return `Пароль должен быть не короче ${MIN_PASSWORD_LENGTH} символов`;
-  if (!matchOk) return "Пароли не совпадают";
+  const failed = PASSWORD_RULES.find((rule) => !rule.test(password));
+  if (failed) return failed.message;
+  if (!matchOk) return "Passwords do not match";
   return null;
+}
+
+function showAuthError(err: unknown) {
+  const error = err instanceof ApiError ? err : new ApiError((err as Error).message);
+  authError.innerHTML = "";
+
+  const title = document.createElement("p");
+  title.textContent = error.message;
+  authError.appendChild(title);
+
+  if (error.details.length === 0) return;
+
+  const list = document.createElement("ul");
+  list.className = "error-list";
+  for (const detail of error.details) {
+    const li = document.createElement("li");
+    li.textContent = detail;
+    list.appendChild(li);
+  }
+  authError.appendChild(list);
 }
 
 passwordInput.addEventListener("input", () => validatePassword(true));
@@ -55,8 +98,8 @@ const nextMonthBtn = document.getElementById("next-month")!;
 const todayBtn = document.getElementById("today-btn")!;
 const dayTitle = document.getElementById("day-title")!;
 
-const monthFormatter = new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" });
-const dayFormatter = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric", weekday: "long" });
+const monthFormatter = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric" });
+const dayFormatter = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", weekday: "long" });
 
 let allTodos: Todo[] = [];
 let viewYear = new Date().getFullYear();
@@ -91,7 +134,7 @@ function groupByDay(todos: Todo[]): Map<string, Todo[]> {
   return map;
 }
 
-const PRIORITY_LABELS: Record<Priority, string> = { 0: "Низкий", 1: "Средний", 2: "Высокий" };
+const PRIORITY_LABELS: Record<Priority, string> = { 0: "Low", 1: "Medium", 2: "High" };
 const PRIORITY_CLASS: Record<Priority, string> = { 0: "prio-low", 1: "prio-medium", 2: "prio-high" };
 
 const tabs = document.getElementById("tabs")!;
@@ -124,7 +167,7 @@ function switchTab(tab: "todos" | "users") {
 }
 
 async function loadUsers() {
-  usersTbody.innerHTML = `<tr><td colspan="4">Загрузка...</td></tr>`;
+  usersTbody.innerHTML = `<tr><td colspan="4">Loading...</td></tr>`;
   try {
     const users = await getUsers();
     renderUsers(users);
@@ -142,16 +185,16 @@ function renderUsers(users: AdminUser[]) {
     emailTd.textContent = u.email;
 
     const roleTd = document.createElement("td");
-    roleTd.textContent = u.role === "Admin" ? "Администратор" : "Пользователь";
+    roleTd.textContent = u.role === "Admin" ? "Administrator" : "User";
 
     const statusTd = document.createElement("td");
-    statusTd.textContent = u.isBanned ? "Заблокирован" : "Активен";
+    statusTd.textContent = u.isBanned ? "Banned" : "Active";
     statusTd.className = u.isBanned ? "status-banned" : "status-active";
 
     const actionTd = document.createElement("td");
     if (u.id !== currentUserId) {
       const btn = document.createElement("button");
-      btn.textContent = u.isBanned ? "Разбанить" : "Забанить";
+      btn.textContent = u.isBanned ? "Unban" : "Ban";
       btn.className = u.isBanned ? "unban" : "ban";
       btn.onclick = async () => {
         try {
@@ -164,7 +207,7 @@ function renderUsers(users: AdminUser[]) {
       };
       actionTd.appendChild(btn);
     } else {
-      actionTd.textContent = "— это вы";
+      actionTd.textContent = "— you";
     }
 
     tr.append(emailTd, roleTd, statusTd, actionTd);
@@ -175,7 +218,7 @@ function renderUsers(users: AdminUser[]) {
 function showApp(role: string, token: string) {
   authSection.classList.add("hidden");
   appSection.classList.remove("hidden");
-  roleLabel.textContent = role === "Admin" ? "Администратор" : "Пользователь";
+  roleLabel.textContent = role === "Admin" ? "Administrator" : "User";
   currentUserId = parseUserIdFromToken(token);
 
   if (role === "Admin") {
@@ -190,7 +233,7 @@ function showApp(role: string, token: string) {
 }
 
 async function loadTodos() {
-  todoList.innerHTML = "<li>Загрузка...</li>";
+  todoList.innerHTML = "<li>Loading...</li>";
   try {
     const category = categoryFilterInput.value.trim() || undefined;
     allTodos = await getTodos(category);
@@ -238,7 +281,7 @@ function renderCalendar(byDay: Map<string, Todo[]>) {
       count.className = pending > 0 ? "day-count" : "day-count all-done";
       count.textContent = pending > 0 ? String(pending) : "✓";
       cell.appendChild(count);
-      cell.title = `Задач: ${todos.length}, невыполнено: ${pending}`;
+      cell.title = `Tasks: ${todos.length}, pending: ${pending}`;
     }
 
     cell.onclick = () => selectDay(date);
@@ -269,7 +312,7 @@ function renderDay(todos: Todo[]) {
 function renderTodos(todos: Todo[]) {
   todoList.innerHTML = "";
   if (todos.length === 0) {
-    todoList.innerHTML = `<li class="empty">На этот день задач нет</li>`;
+    todoList.innerHTML = `<li class="empty">No tasks for this day</li>`;
     return;
   }
 
@@ -310,7 +353,7 @@ function renderTodos(todos: Todo[]) {
     }
 
     const delBtn = document.createElement("button");
-    delBtn.textContent = "Удалить";
+    delBtn.textContent = "Delete";
     delBtn.onclick = async () => {
       await deleteTodo(todo.id);
       void loadTodos();
@@ -337,7 +380,7 @@ loginForm.addEventListener("submit", async (e) => {
     localStorage.setItem("role", res.role);
     showApp(res.role, res.token);
   } catch (err) {
-    authError.textContent = (err as Error).message;
+    showAuthError(err);
   }
 });
 
@@ -356,7 +399,7 @@ registerBtn.addEventListener("click", async () => {
     localStorage.setItem("role", res.role);
     showApp(res.role, res.token);
   } catch (err) {
-    authError.textContent = (err as Error).message;
+    showAuthError(err);
   }
 });
 
@@ -391,7 +434,6 @@ logoutBtn.addEventListener("click", () => {
   authSection.classList.remove("hidden");
 });
 
-// Если токен уже есть — сразу показать приложение с сохранённой ролью
 const savedToken = localStorage.getItem("token");
 if (savedToken) {
   showApp(localStorage.getItem("role") ?? "User", savedToken);

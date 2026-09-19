@@ -1,40 +1,40 @@
 # Todo List App
 
-Простое веб-приложение для управления списком задач. Backend на C# (ASP.NET Core), frontend на HTML, CSS и TypeScript.
+A simple web application for managing a task list. Backend in C# (ASP.NET Core), frontend in HTML, CSS and TypeScript.
 
-## Стек технологий
+## Tech stack
 
 **Backend**
 - C# / ASP.NET Core Web API
 - Entity Framework Core (ORM)
-- SQLite (база данных)
-- ASP.NET Core Identity (пользователи, роли)
-- JWT (авторизация по токену)
+- SQLite (database)
+- ASP.NET Core Identity (users, roles)
+- JWT (token-based authentication)
 
 **Frontend**
 - HTML5
 - CSS3
 - TypeScript
 
-**Инфраструктура**
+**Infrastructure**
 - Docker / Docker Compose
 
-## Архитектура
+## Architecture
 
-Backend построен по слоистой архитектуре:
+The backend follows a layered architecture:
 
 ```
-TodosController → TodoService → ITodoRepository → AppDbContext → БД
+TodosController → TodoService → ITodoRepository → AppDbContext → DB
 ```
 
-- **TodosController** — принимает HTTP-запросы, отдаёт ответы (REST API)
-- **TodoService** — бизнес-логика (создание, валидация, отметка выполнения)
-- **ITodoRepository / TodoRepository** — доступ к данным
-- **AppDbContext** — контекст EF Core, работа с БД
+- **TodosController** — handles HTTP requests and returns responses (REST API)
+- **TodoService** — business logic (creation, validation, marking as done)
+- **ITodoRepository / TodoRepository** — data access
+- **AppDbContext** — EF Core context, database access
 
-Frontend на TypeScript обращается к API через `fetch` и обновляет DOM без перезагрузки страницы.
+The TypeScript frontend calls the API via `fetch` and updates the DOM without reloading the page.
 
-## Модель данных
+## Data model
 
 ```csharp
 class TodoItem
@@ -45,61 +45,61 @@ class TodoItem
     bool IsDone;
     DateTime CreatedAt;
     DateTime? DueDate;
-    string UserId;      // владелец задачи
+    string UserId;      // task owner
 }
 
 class AppUser : IdentityUser
 {
-    // email, username, password наследуются от IdentityUser
+    // email, username, password are inherited from IdentityUser
 }
 ```
 
-Роли: `User` и `Admin` (хранятся через `IdentityRole`, назначаются пользователю при регистрации/через админа).
+Roles: `User` and `Admin` (stored via `IdentityRole`, assigned on sign up or by an admin).
 
-## Роли и авторизация
+## Roles and authorization
 
-| Роль  | Права                                                         |
+| Role  | Permissions                                             |
 |-------|----------------------------------------------------------------|
-| User  | Видит и редактирует только свои задачи                        |
-| Admin | Видит все задачи всех пользователей, может управлять юзерами  |
+| User  | Sees and edits only their own tasks                     |
+| Admin | Sees all tasks of all users, can manage users           |
 
-Авторизация реализована через JWT: после логина клиент получает токен, в котором зашита роль (`ClaimTypes.Role`). Токен передаётся в заголовке `Authorization: Bearer <token>` при каждом запросе.
+Authorization uses JWT: after logging in, the client receives a token containing the role (`ClaimTypes.Role`). The token is sent in the `Authorization: Bearer <token>` header with every request.
 
-Эндпоинты защищаются атрибутами:
+Endpoints are protected with attributes:
 
 ```csharp
-[Authorize] // любой авторизованный пользователь
-[Authorize(Roles = "Admin")] // только администратор
+[Authorize] // any authenticated user
+[Authorize(Roles = "Admin")] // administrators only
 ```
 
-## API эндпоинты
+## API endpoints
 
-**Авторизация**
+**Authentication**
 
-| Метод  | Путь                 | Описание                          | Доступ      |
+| Method | Path                 | Description                       | Access      |
 |--------|----------------------|------------------------------------|-------------|
-| POST   | /api/auth/register   | Регистрация нового пользователя    | Все         |
-| POST   | /api/auth/login      | Вход, получение JWT-токена         | Все         |
+| POST   | /api/auth/register   | Register a new user               | Everyone    |
+| POST   | /api/auth/login      | Log in, receive a JWT token       | Everyone    |
 
-**Задачи**
+**Tasks**
 
-| Метод  | Путь               | Описание                          | Доступ                  |
+| Method | Path               | Description                       | Access                     |
 |--------|--------------------|-------------------------------------|--------------------------|
-| GET    | /api/todos         | Получить свои задачи               | User, Admin              |
-| GET    | /api/todos/{id}    | Получить задачу по id              | User (свою), Admin (любую) |
-| POST   | /api/todos         | Создать новую задачу               | User, Admin               |
-| PUT    | /api/todos/{id}    | Обновить задачу                     | User (свою), Admin (любую) |
-| DELETE | /api/todos/{id}    | Удалить задачу                      | User (свою), Admin (любую) |
+| GET    | /api/todos         | Get own tasks                     | User, Admin                |
+| GET    | /api/todos/{id}    | Get a task by id                  | User (own), Admin (any)    |
+| POST   | /api/todos         | Create a new task                 | User, Admin                |
+| PUT    | /api/todos/{id}    | Update a task                     | User (own), Admin (any)    |
+| DELETE | /api/todos/{id}    | Delete a task                     | User (own), Admin (any)    |
 
-**Администрирование**
+**Administration**
 
-| Метод  | Путь               | Описание                          | Доступ |
+| Method | Path               | Description                       | Access |
 |--------|--------------------|-------------------------------------|--------|
-| GET    | /api/admin/users   | Список всех пользователей           | Admin  |
-| GET    | /api/admin/todos   | Все задачи всех пользователей       | Admin  |
-| DELETE | /api/admin/users/{id} | Удалить пользователя             | Admin  |
+| GET    | /api/admin/users   | List all users                    | Admin  |
+| GET    | /api/admin/todos   | All tasks of all users            | Admin  |
+| DELETE | /api/admin/users/{id} | Delete a user                  | Admin  |
 
-## Структура проекта
+## Project structure
 
 ```
 todo-app/
@@ -134,9 +134,9 @@ todo-app/
 └── README.md
 ```
 
-## Запуск проекта
+## Running the project
 
-Проект кроссплатформенный: и .NET SDK, и Node.js/TypeScript, и Docker нормально работают на macOS (включая Apple Silicon — M1/M2/M3), Windows и Linux. Ниже — запуск без Docker (по отдельности) и через Docker (проще всего).
+The project is cross-platform: the .NET SDK, Node.js/TypeScript and Docker all work on macOS (including Apple Silicon — M1/M2/M3), Windows and Linux. Below are instructions for running without Docker (each part separately) and with Docker (the easiest way).
 
 ### Backend
 
@@ -147,7 +147,7 @@ dotnet ef database update
 dotnet run
 ```
 
-API будет доступен по адресу `https://localhost:5001` (или порт из `launchSettings.json`).
+The API will be available at `https://localhost:5001` (or the port from `launchSettings.json`).
 
 ### Frontend
 
@@ -157,21 +157,21 @@ npm install
 npx tsc --watch
 ```
 
-Открыть `index.html` в браузере или запустить через любой статический сервер (например, `live-server`).
+Open `index.html` in a browser or serve it with any static server (e.g. `live-server`).
 
-> Убедитесь, что в `frontend/src/api.ts` указан правильный адрес backend API.
+> Make sure `frontend/src/api.ts` points to the correct backend API address.
 
-### Через Docker
+### With Docker
 
-Проще всего поднять весь проект (backend + frontend) одной командой:
+The easiest way to start the whole project (backend + frontend) is a single command:
 
 ```bash
 docker compose up --build
 ```
 
-Backend будет доступен на `http://localhost:5001`, frontend — на `http://localhost:8080`.
+The backend will be available at `http://localhost:5001`, the frontend at `http://localhost:8080`.
 
-Пример `docker-compose.yml`:
+Example `docker-compose.yml`:
 
 ```yaml
 services:
@@ -196,7 +196,7 @@ volumes:
   todo-data:
 ```
 
-Пример `backend/Dockerfile`:
+Example `backend/Dockerfile`:
 
 ```dockerfile
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
@@ -211,7 +211,7 @@ EXPOSE 8080
 ENTRYPOINT ["dotnet", "TodoApp.Backend.dll"]
 ```
 
-Пример `frontend/Dockerfile` (сборка TS + отдача статики через nginx):
+Example `frontend/Dockerfile` (TS build + serving static files via nginx):
 
 ```dockerfile
 FROM node:20 AS build
@@ -226,14 +226,14 @@ EXPOSE 80
 
 ## Roadmap
 
-1. Планирование — требования, модели данных
-2. База данных — схема, EF Core, миграции
+1. Planning — requirements, data models
+2. Database — schema, EF Core, migrations
 3. Backend (C#) — ASP.NET Core, REST API
-4. Авторизация и роли — Identity, JWT, User/Admin
-5. Frontend (HTML/CSS/TS) — разметка, стили, логика
-6. Интеграция — fetch API, CRUD-запросы
-7. Тесты и деплой — проверка, публикация
+4. Authentication and roles — Identity, JWT, User/Admin
+5. Frontend (HTML/CSS/TS) — markup, styles, logic
+6. Integration — fetch API, CRUD requests
+7. Testing and deployment — verification, publishing
 
-## Лицензия
+## License
 
 MIT

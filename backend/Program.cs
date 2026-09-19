@@ -10,7 +10,6 @@ using TodoApp.Backend.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// БД
 var connectionString = builder.Configuration.GetConnectionString("Default")
     ?? "Data Source=todo.db";
 builder.Services.AddDbContext<AppDbContext>(opt => opt.UseSqlite(connectionString));
@@ -23,6 +22,7 @@ builder.Services
         opt.Password.RequiredLength = 6;
     })
     .AddEntityFrameworkStores<AppDbContext>()
+    .AddErrorDescriber<AppIdentityErrorDescriber>()
     .AddDefaultTokenProviders();
 
 // JWT
@@ -64,12 +64,9 @@ builder.Services.AddCors(opt =>
 
 var app = builder.Build();
 
-// Автомиграция + сидинг ролей при старте (удобно для Docker)
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    // EnsureCreated — для старта без готовых миграций.
-    // Когда понадобится менять схему, переходите на dotnet ef migrations + Migrate().
     db.Database.EnsureCreated();
 
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
@@ -79,7 +76,6 @@ using (var scope = app.Services.CreateScope())
             await roleManager.CreateAsync(new IdentityRole(role));
     }
 
-    // Сидинг первого администратора из переменных окружения (если заданы)
     var adminEmail = builder.Configuration["Admin:Email"];
     var adminPassword = builder.Configuration["Admin:Password"];
     if (!string.IsNullOrWhiteSpace(adminEmail) && !string.IsNullOrWhiteSpace(adminPassword))
@@ -91,12 +87,14 @@ using (var scope = app.Services.CreateScope())
         {
             var admin = new AppUser { UserName = adminEmail, Email = adminEmail, EmailConfirmed = true };
             var result = await userManager.CreateAsync(admin, adminPassword);
-            if (result.Succeeded)
-                await userManager.AddToRoleAsync(admin, Roles.Admin);
+            if (!result.Succeeded)
+                throw new InvalidOperationException(
+                    $"Failed to create admin {adminEmail}: {string.Join("; ", result.Errors.Select(e => e.Description))}");
+
+            await userManager.AddToRoleAsync(admin, Roles.Admin);
         }
         else if (!await userManager.IsInRoleAsync(existingAdmin, Roles.Admin))
         {
-            // Пользователь с таким email уже есть, но не админ — повышаем
             await userManager.AddToRoleAsync(existingAdmin, Roles.Admin);
         }
     }
@@ -111,8 +109,6 @@ if (app.Environment.IsDevelopment())
 app.UseCors();
 app.UseAuthentication();
 
-// Проверка бана на живом токене: даже если JWT ещё не истёк,
-// забаненный пользователь не сможет делать запросы.
 app.Use(async (context, next) =>
 {
     if (context.User.Identity?.IsAuthenticated == true)
@@ -131,7 +127,7 @@ app.Use(async (context, next) =>
             if (isBanned)
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                await context.Response.WriteAsync("Аккаунт заблокирован администратором");
+                await context.Response.WriteAsync("Account has been banned by an administrator");
                 return;
             }
         }

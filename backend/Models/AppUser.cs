@@ -16,4 +16,5 @@ public static class Roles
 public record RegisterDto(string Email, string Password);
 public record LoginDto(string Email, string Password);
 public record AuthResponseDto(string Token, string Email, string Role);
+public record ErrorResponseDto(string Message, IEnumerable<string> Errors);
 public record AdminUserDto(string Id, string Email, string Role, bool IsBanned);

@@ -18,7 +18,6 @@ public class TodoItem
     public string? Category { get; set; }
     public TodoPriority Priority { get; set; } = TodoPriority.Medium;
 
-    // Владелец задачи
     public string UserId { get; set; } = string.Empty;
 }
 

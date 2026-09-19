@@ -288,3 +288,17 @@ select {
   .day-num { font-size: 12px; }
   .day-count { font-size: 10px; line-height: 16px; min-width: 16px; }
 }
+
+#auth-error p { margin: 0 0 4px; font-weight: 600; }
+
+.error-list {
+  list-style: disc;
+  padding-left: 18px;
+  margin: 0;
+}
+
+.error-list li {
+  display: list-item;
+  border: none;
+  padding: 2px 0;
+}

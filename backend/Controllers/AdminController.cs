@@ -47,7 +47,7 @@ public class AdminController : ControllerBase
     public async Task<IActionResult> BanUser(string id)
     {
         if (id == CurrentUserId)
-            return BadRequest("Нельзя заблокировать самого себя");
+            return BadRequest("You cannot ban yourself");
 
         var user = await _userManager.FindByIdAsync(id);
         if (user is null) return NotFound();
@@ -72,7 +72,7 @@ public class AdminController : ControllerBase
     public async Task<IActionResult> DeleteUser(string id)
     {
         if (id == CurrentUserId)
-            return BadRequest("Нельзя удалить самого себя");
+            return BadRequest("You cannot delete yourself");
 
         var user = await _userManager.FindByIdAsync(id);
         if (user is null) return NotFound();
