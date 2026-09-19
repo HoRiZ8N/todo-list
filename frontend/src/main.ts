@@ -1,7 +1,7 @@
 import type { Todo, Priority } from "./types.js";
 import { getTodos, createTodo, updateTodo, deleteTodo } from "./api.js";
 import { initAuth } from "./auth.js";
-import { mountAdminPanel } from "./admin.js";
+import { mountUsersPanel } from "./admin.js";
 import { loadSession, saveSession, clearSession, type Session } from "./session.js";
 
 const authSection = document.getElementById("auth-section")!;
@@ -72,7 +72,13 @@ function showApp(session: Session) {
   roleLabel.textContent = session.isAdmin ? "Administrator" : "User";
 
   unmountAdmin?.();
-  unmountAdmin = session.isAdmin ? mountAdminPanel(todosTab, session.userId) : null;
+  unmountAdmin = null;
+  todosTab.classList.toggle("hidden", session.isAdmin);
+
+  if (session.isAdmin) {
+    unmountAdmin = mountUsersPanel(appSection, session.userId);
+    return;
+  }
 
   void loadTodos();
 }

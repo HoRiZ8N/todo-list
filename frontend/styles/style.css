@@ -137,26 +137,6 @@ li {
 .badge.prio-medium { background: #FAEEDA; color: #854F0B; }
 .badge.prio-high { background: #FCEBEB; color: #B3261E; }
 
-.tabs {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 16px;
-  border-bottom: 1px solid #eee;
-}
-
-.tab {
-  background: none;
-  color: #666;
-  border-radius: 6px 6px 0 0;
-  padding: 8px 14px;
-}
-
-.tab.active {
-  background: #E1F5EE;
-  color: #0f6e56;
-  font-weight: 600;
-}
-
 table {
   width: 100%;
   border-collapse: collapse;
@@ -322,3 +302,5 @@ button:disabled { opacity: 0.6; cursor: default; }
 }
 
 .auth-switch a { color: #0f6e56; }
+
+.panel-title { font-size: 16px; margin: 0 0 12px; }

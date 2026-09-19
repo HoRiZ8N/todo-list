@@ -1,40 +1,16 @@
 import type { AdminUser } from "./types.js";
 import { getUsers, banUser, unbanUser } from "./api.js";
 
-function createTab(label: string, active: boolean): HTMLButtonElement {
-  const tab = document.createElement("button");
-  tab.type = "button";
-  tab.className = active ? "tab active" : "tab";
-  tab.textContent = label;
-  return tab;
-}
-
-export function mountAdminPanel(todosTab: HTMLElement, currentUserId: string | null): () => void {
-  const tabs = document.createElement("div");
-  tabs.className = "tabs";
-  const tabTodos = createTab("Tasks", true);
-  const tabUsers = createTab("Users", false);
-  tabs.append(tabTodos, tabUsers);
-
-  const usersTab = document.createElement("div");
-  usersTab.className = "hidden";
-  usersTab.innerHTML = `
+export function mountUsersPanel(container: HTMLElement, currentUserId: string | null): () => void {
+  const panel = document.createElement("div");
+  panel.innerHTML = `
+    <h2 class="panel-title">Users</h2>
     <table>
       <thead><tr><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
       <tbody></tbody>
     </table>`;
-  const tbody = usersTab.querySelector("tbody")!;
-
-  todosTab.before(tabs);
-  todosTab.after(usersTab);
-
-  function switchTab(showUsers: boolean) {
-    tabTodos.classList.toggle("active", !showUsers);
-    tabUsers.classList.toggle("active", showUsers);
-    todosTab.classList.toggle("hidden", showUsers);
-    usersTab.classList.toggle("hidden", !showUsers);
-    if (showUsers) void loadUsers();
-  }
+  const tbody = panel.querySelector("tbody")!;
+  container.appendChild(panel);
 
   async function loadUsers() {
     tbody.innerHTML = `<tr><td colspan="4">Loading...</td></tr>`;
@@ -83,12 +59,7 @@ export function mountAdminPanel(todosTab: HTMLElement, currentUserId: string | n
     }
   }
 
-  tabTodos.onclick = () => switchTab(false);
-  tabUsers.onclick = () => switchTab(true);
+  void loadUsers();
 
-  return () => {
-    tabs.remove();
-    usersTab.remove();
-    todosTab.classList.remove("hidden");
-  };
+  return () => panel.remove();
 }
