@@ -1,85 +1,12 @@
-import type { Todo, Priority, AdminUser } from "./types.js";
-import {
-  login, register, getTodos, createTodo, updateTodo, deleteTodo,
-  getUsers, banUser, unbanUser,
-  ApiError,
-} from "./api.js";
+import type { Todo, Priority } from "./types.js";
+import { getTodos, createTodo, updateTodo, deleteTodo } from "./api.js";
+import { initAuth } from "./auth.js";
+import { mountAdminPanel } from "./admin.js";
+import { loadSession, saveSession, clearSession, type Session } from "./session.js";
 
 const authSection = document.getElementById("auth-section")!;
 const appSection = document.getElementById("app-section")!;
-const loginForm = document.getElementById("login-form") as HTMLFormElement;
-const registerBtn = document.getElementById("register-btn")!;
-const emailInput = document.getElementById("email") as HTMLInputElement;
-const passwordInput = document.getElementById("password") as HTMLInputElement;
-const passwordConfirmInput = document.getElementById("password-confirm") as HTMLInputElement;
-const hintLength = document.getElementById("hint-length")!;
-const hintMatch = document.getElementById("hint-match")!;
-const authError = document.getElementById("auth-error")!;
-
-const MIN_PASSWORD_LENGTH = 6;
-
-interface PasswordRule {
-  hint: HTMLElement;
-  test: (password: string) => boolean;
-  message: string;
-}
-
-const lengthRule: PasswordRule = {
-  hint: hintLength,
-  test: (p) => p.length >= MIN_PASSWORD_LENGTH,
-  message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters long`,
-};
-
-const PASSWORD_RULES: PasswordRule[] = [
-  lengthRule,
-  { hint: document.getElementById("hint-digit")!, test: (p) => /[0-9]/.test(p), message: "Password must contain a digit" },
-  { hint: document.getElementById("hint-lower")!, test: (p) => /[a-z]/.test(p), message: "Password must contain a lowercase letter (a-z)" },
-  { hint: document.getElementById("hint-upper")!, test: (p) => /[A-Z]/.test(p), message: "Password must contain an uppercase letter (A-Z)" },
-];
-
-function validatePassword(forRegister: boolean): string | null {
-  const password = passwordInput.value;
-
-  for (const rule of PASSWORD_RULES) {
-    const ok = rule.test(password);
-    rule.hint.classList.toggle("ok", ok);
-    rule.hint.classList.toggle("bad", !ok && password.length > 0);
-  }
-
-  if (!forRegister) return lengthRule.test(password) ? null : lengthRule.message;
-
-  const matchOk = password.length > 0 && password === passwordConfirmInput.value;
-  hintMatch.classList.toggle("ok", matchOk);
-  hintMatch.classList.toggle("bad", !matchOk && passwordConfirmInput.value.length > 0);
-
-  const failed = PASSWORD_RULES.find((rule) => !rule.test(password));
-  if (failed) return failed.message;
-  if (!matchOk) return "Passwords do not match";
-  return null;
-}
-
-function showAuthError(err: unknown) {
-  const error = err instanceof ApiError ? err : new ApiError((err as Error).message);
-  authError.innerHTML = "";
-
-  const title = document.createElement("p");
-  title.textContent = error.message;
-  authError.appendChild(title);
-
-  if (error.details.length === 0) return;
-
-  const list = document.createElement("ul");
-  list.className = "error-list";
-  for (const detail of error.details) {
-    const li = document.createElement("li");
-    li.textContent = detail;
-    list.appendChild(li);
-  }
-  authError.appendChild(list);
-}
-
-passwordInput.addEventListener("input", () => validatePassword(true));
-passwordConfirmInput.addEventListener("input", () => validatePassword(true));
+const todosTab = document.getElementById("todos-tab")!;
 
 const todoForm = document.getElementById("todo-form") as HTMLFormElement;
 const titleInput = document.getElementById("title") as HTMLInputElement;
@@ -137,99 +64,26 @@ function groupByDay(todos: Todo[]): Map<string, Todo[]> {
 const PRIORITY_LABELS: Record<Priority, string> = { 0: "Low", 1: "Medium", 2: "High" };
 const PRIORITY_CLASS: Record<Priority, string> = { 0: "prio-low", 1: "prio-medium", 2: "prio-high" };
 
-const tabs = document.getElementById("tabs")!;
-const tabTodos = document.getElementById("tab-todos")!;
-const tabUsers = document.getElementById("tab-users")!;
-const todosTab = document.getElementById("todos-tab")!;
-const usersTab = document.getElementById("users-tab")!;
-const usersTbody = document.getElementById("users-tbody")!;
+let unmountAdmin: (() => void) | null = null;
 
-let currentUserId: string | null = null;
-
-function parseUserIdFromToken(token: string): string | null {
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return payload.sub ?? payload.nameid ?? null;
-  } catch {
-    return null;
-  }
-}
-
-tabTodos.addEventListener("click", () => switchTab("todos"));
-tabUsers.addEventListener("click", () => switchTab("users"));
-
-function switchTab(tab: "todos" | "users") {
-  tabTodos.classList.toggle("active", tab === "todos");
-  tabUsers.classList.toggle("active", tab === "users");
-  todosTab.classList.toggle("hidden", tab !== "todos");
-  usersTab.classList.toggle("hidden", tab !== "users");
-  if (tab === "users") void loadUsers();
-}
-
-async function loadUsers() {
-  usersTbody.innerHTML = `<tr><td colspan="4">Loading...</td></tr>`;
-  try {
-    const users = await getUsers();
-    renderUsers(users);
-  } catch (e) {
-    usersTbody.innerHTML = `<tr><td colspan="4" class="error">${(e as Error).message}</td></tr>`;
-  }
-}
-
-function renderUsers(users: AdminUser[]) {
-  usersTbody.innerHTML = "";
-  for (const u of users) {
-    const tr = document.createElement("tr");
-
-    const emailTd = document.createElement("td");
-    emailTd.textContent = u.email;
-
-    const roleTd = document.createElement("td");
-    roleTd.textContent = u.role === "Admin" ? "Administrator" : "User";
-
-    const statusTd = document.createElement("td");
-    statusTd.textContent = u.isBanned ? "Banned" : "Active";
-    statusTd.className = u.isBanned ? "status-banned" : "status-active";
-
-    const actionTd = document.createElement("td");
-    if (u.id !== currentUserId) {
-      const btn = document.createElement("button");
-      btn.textContent = u.isBanned ? "Unban" : "Ban";
-      btn.className = u.isBanned ? "unban" : "ban";
-      btn.onclick = async () => {
-        try {
-          if (u.isBanned) await unbanUser(u.id);
-          else await banUser(u.id);
-          void loadUsers();
-        } catch (e) {
-          alert((e as Error).message);
-        }
-      };
-      actionTd.appendChild(btn);
-    } else {
-      actionTd.textContent = "— you";
-    }
-
-    tr.append(emailTd, roleTd, statusTd, actionTd);
-    usersTbody.appendChild(tr);
-  }
-}
-
-function showApp(role: string, token: string) {
+function showApp(session: Session) {
   authSection.classList.add("hidden");
   appSection.classList.remove("hidden");
-  roleLabel.textContent = role === "Admin" ? "Administrator" : "User";
-  currentUserId = parseUserIdFromToken(token);
+  roleLabel.textContent = session.isAdmin ? "Administrator" : "User";
 
-  if (role === "Admin") {
-    tabs.classList.remove("hidden");
-  } else {
-    tabs.classList.add("hidden");
-    todosTab.classList.remove("hidden");
-    usersTab.classList.add("hidden");
-  }
+  unmountAdmin?.();
+  unmountAdmin = session.isAdmin ? mountAdminPanel(todosTab, session.userId) : null;
 
   void loadTodos();
+}
+
+function showAuth() {
+  unmountAdmin?.();
+  unmountAdmin = null;
+  allTodos = [];
+  appSection.classList.add("hidden");
+  authSection.classList.remove("hidden");
+  resetAuth();
 }
 
 async function loadTodos() {
@@ -364,45 +218,6 @@ function renderTodos(todos: Todo[]) {
   }
 }
 
-loginForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  authError.textContent = "";
-
-  const validationError = validatePassword(false);
-  if (validationError) {
-    authError.textContent = validationError;
-    return;
-  }
-
-  try {
-    const res = await login(emailInput.value, passwordInput.value);
-    localStorage.setItem("token", res.token);
-    localStorage.setItem("role", res.role);
-    showApp(res.role, res.token);
-  } catch (err) {
-    showAuthError(err);
-  }
-});
-
-registerBtn.addEventListener("click", async () => {
-  authError.textContent = "";
-
-  const validationError = validatePassword(true);
-  if (validationError) {
-    authError.textContent = validationError;
-    return;
-  }
-
-  try {
-    const res = await register(emailInput.value, passwordInput.value);
-    localStorage.setItem("token", res.token);
-    localStorage.setItem("role", res.role);
-    showApp(res.role, res.token);
-  } catch (err) {
-    showAuthError(err);
-  }
-});
-
 todoForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!titleInput.value.trim()) return;
@@ -427,14 +242,15 @@ filterClearBtn.addEventListener("click", () => {
   void loadTodos();
 });
 
-logoutBtn.addEventListener("click", () => {
-  localStorage.removeItem("token");
-  localStorage.removeItem("role");
-  appSection.classList.add("hidden");
-  authSection.classList.remove("hidden");
+const resetAuth = initAuth((token) => {
+  const session = saveSession(token);
+  if (session) showApp(session);
 });
 
-const savedToken = localStorage.getItem("token");
-if (savedToken) {
-  showApp(localStorage.getItem("role") ?? "User", savedToken);
-}
+logoutBtn.addEventListener("click", () => {
+  clearSession();
+  showAuth();
+});
+
+const session = loadSession();
+if (session) showApp(session);

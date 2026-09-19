@@ -10,32 +10,41 @@
     <h1>Todo List</h1>
 
     <section id="auth-section">
-      <form id="login-form">
-        <input id="email" type="email" placeholder="Email" required />
-        <input id="password" type="password" placeholder="Password" required minlength="6" />
-        <input id="password-confirm" type="password" placeholder="Repeat password (for sign up)" />
-        <ul id="password-hints" class="hints">
-          <li id="hint-length">At least 6 characters</li>
-          <li id="hint-digit">At least one digit (0-9)</li>
-          <li id="hint-lower">Lowercase letter (a-z)</li>
-          <li id="hint-upper">Uppercase letter (A-Z)</li>
-          <li id="hint-match">Passwords match</li>
-        </ul>
-        <button type="submit">Log in</button>
-        <button type="button" id="register-btn">Sign up</button>
-      </form>
-      <div id="auth-error" class="error"></div>
+      <div id="login-view">
+        <h2 class="auth-title">Log in</h2>
+        <form id="login-form" class="auth-form">
+          <input id="login-email" type="email" placeholder="Email" autocomplete="username" required />
+          <input id="login-password" type="password" placeholder="Password" autocomplete="current-password" required />
+          <button type="submit">Log in</button>
+        </form>
+        <div id="login-error" class="error"></div>
+        <p class="auth-switch">Don't have an account? <a href="#register">Sign up</a></p>
+      </div>
+
+      <div id="register-view" class="hidden">
+        <h2 class="auth-title">Sign up</h2>
+        <form id="register-form" class="auth-form">
+          <input id="register-email" type="email" placeholder="Email" autocomplete="email" required />
+          <input id="register-password" type="password" placeholder="Password" autocomplete="new-password" required />
+          <input id="register-password-confirm" type="password" placeholder="Repeat password" autocomplete="new-password" required />
+          <ul class="hints">
+            <li id="hint-length">At least 6 characters</li>
+            <li id="hint-digit">At least one digit (0-9)</li>
+            <li id="hint-lower">Lowercase letter (a-z)</li>
+            <li id="hint-upper">Uppercase letter (A-Z)</li>
+            <li id="hint-match">Passwords match</li>
+          </ul>
+          <button type="submit">Create account</button>
+        </form>
+        <div id="register-error" class="error"></div>
+        <p class="auth-switch">Already have an account? <a href="#login">Log in</a></p>
+      </div>
     </section>
 
     <section id="app-section" class="hidden">
       <div class="header">
         <span>Role: <strong id="role-label"></strong></span>
         <button id="logout-btn">Log out</button>
-      </div>
-
-      <div id="tabs" class="tabs hidden">
-        <button type="button" id="tab-todos" class="tab active">Tasks</button>
-        <button type="button" id="tab-users" class="tab">Users</button>
       </div>
 
       <div id="todos-tab">
@@ -74,20 +83,6 @@
 
           <ul id="todo-list"></ul>
         </div>
-      </div>
-
-      <div id="users-tab" class="hidden">
-        <table id="users-table">
-          <thead>
-            <tr>
-              <th>Email</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="users-tbody"></tbody>
-        </table>
       </div>
     </section>
   </main>
