@@ -36,24 +36,41 @@
       </div>
 
       <div id="todos-tab">
-        <form id="todo-form">
-          <input id="title" type="text" placeholder="Новая задача" required />
-          <input id="category" type="text" placeholder="Категория (необязательно)" />
-          <select id="priority">
-            <option value="0">Низкий приоритет</option>
-            <option value="1" selected>Средний приоритет</option>
-            <option value="2">Высокий приоритет</option>
-          </select>
-          <button type="submit">Добавить</button>
-        </form>
-
         <div class="filter-row">
           <input id="category-filter" type="text" placeholder="Фильтр по категории" />
           <button type="button" id="filter-btn">Фильтровать</button>
           <button type="button" id="filter-clear-btn">Сбросить</button>
         </div>
 
-        <ul id="todo-list"></ul>
+        <div class="calendar">
+          <div class="calendar-nav">
+            <button type="button" id="prev-month" class="nav-btn" aria-label="Предыдущий месяц">&lsaquo;</button>
+            <span id="month-label" class="month-label"></span>
+            <button type="button" id="next-month" class="nav-btn" aria-label="Следующий месяц">&rsaquo;</button>
+            <button type="button" id="today-btn" class="today-btn">Сегодня</button>
+          </div>
+          <div class="calendar-weekdays">
+            <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
+          </div>
+          <div id="calendar-grid" class="calendar-grid"></div>
+        </div>
+
+        <div class="day-panel">
+          <h2 id="day-title" class="day-title"></h2>
+
+          <form id="todo-form">
+            <input id="title" type="text" placeholder="Новая задача на этот день" required />
+            <input id="category" type="text" placeholder="Категория (необязательно)" />
+            <select id="priority">
+              <option value="0">Низкий приоритет</option>
+              <option value="1" selected>Средний приоритет</option>
+              <option value="2">Высокий приоритет</option>
+            </select>
+            <button type="submit">Добавить</button>
+          </form>
+
+          <ul id="todo-list"></ul>
+        </div>
       </div>
 
       <div id="users-tab" class="hidden">

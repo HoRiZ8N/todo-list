@@ -48,6 +48,48 @@ const filterClearBtn = document.getElementById("filter-clear-btn")!;
 const todoList = document.getElementById("todo-list")!;
 const roleLabel = document.getElementById("role-label")!;
 const logoutBtn = document.getElementById("logout-btn")!;
+const calendarGrid = document.getElementById("calendar-grid")!;
+const monthLabel = document.getElementById("month-label")!;
+const prevMonthBtn = document.getElementById("prev-month")!;
+const nextMonthBtn = document.getElementById("next-month")!;
+const todayBtn = document.getElementById("today-btn")!;
+const dayTitle = document.getElementById("day-title")!;
+
+const monthFormatter = new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" });
+const dayFormatter = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric", weekday: "long" });
+
+let allTodos: Todo[] = [];
+let viewYear = new Date().getFullYear();
+let viewMonth = new Date().getMonth();
+let selectedKey = toKey(new Date());
+
+function toKey(d: Date): string {
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+function fromKey(key: string): Date {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function todoKey(todo: Todo): string {
+  if (todo.dueDate) return todo.dueDate.slice(0, 10);
+  const created = /(Z|[+-]\d{2}:\d{2})$/.test(todo.createdAt) ? todo.createdAt : `${todo.createdAt}Z`;
+  return toKey(new Date(created));
+}
+
+function groupByDay(todos: Todo[]): Map<string, Todo[]> {
+  const map = new Map<string, Todo[]>();
+  for (const todo of todos) {
+    const key = todoKey(todo);
+    const list = map.get(key);
+    if (list) list.push(todo);
+    else map.set(key, [todo]);
+  }
+  return map;
+}
 
 const PRIORITY_LABELS: Record<Priority, string> = { 0: "Низкий", 1: "Средний", 2: "Высокий" };
 const PRIORITY_CLASS: Record<Priority, string> = { 0: "prio-low", 1: "prio-medium", 2: "prio-high" };
@@ -151,17 +193,83 @@ async function loadTodos() {
   todoList.innerHTML = "<li>Загрузка...</li>";
   try {
     const category = categoryFilterInput.value.trim() || undefined;
-    const todos = await getTodos(category);
-    renderTodos(todos);
+    allTodos = await getTodos(category);
+    render();
   } catch (e) {
     todoList.innerHTML = `<li class="error">${(e as Error).message}</li>`;
   }
 }
 
+function render() {
+  const byDay = groupByDay(allTodos);
+  renderCalendar(byDay);
+  renderDay(byDay.get(selectedKey) ?? []);
+}
+
+function renderCalendar(byDay: Map<string, Todo[]>) {
+  const label = monthFormatter.format(new Date(viewYear, viewMonth, 1));
+  monthLabel.textContent = label.charAt(0).toUpperCase() + label.slice(1);
+
+  const offset = (new Date(viewYear, viewMonth, 1).getDay() + 6) % 7;
+  const todayKey = toKey(new Date());
+
+  calendarGrid.innerHTML = "";
+  for (let i = 0; i < 42; i++) {
+    const date = new Date(viewYear, viewMonth, 1 - offset + i);
+    const key = toKey(date);
+    const todos = byDay.get(key) ?? [];
+    const pending = todos.filter((t) => !t.isDone).length;
+
+    const cell = document.createElement("button");
+    cell.type = "button";
+    cell.className = "day-cell";
+    cell.classList.toggle("other-month", date.getMonth() !== viewMonth);
+    cell.classList.toggle("today", key === todayKey);
+    cell.classList.toggle("selected", key === selectedKey);
+    cell.classList.toggle("weekend", date.getDay() === 0 || date.getDay() === 6);
+
+    const num = document.createElement("span");
+    num.className = "day-num";
+    num.textContent = String(date.getDate());
+    cell.appendChild(num);
+
+    if (todos.length > 0) {
+      const count = document.createElement("span");
+      count.className = pending > 0 ? "day-count" : "day-count all-done";
+      count.textContent = pending > 0 ? String(pending) : "✓";
+      cell.appendChild(count);
+      cell.title = `Задач: ${todos.length}, невыполнено: ${pending}`;
+    }
+
+    cell.onclick = () => selectDay(date);
+    calendarGrid.appendChild(cell);
+  }
+}
+
+function selectDay(date: Date) {
+  selectedKey = toKey(date);
+  viewYear = date.getFullYear();
+  viewMonth = date.getMonth();
+  render();
+}
+
+function shiftMonth(delta: number) {
+  const d = new Date(viewYear, viewMonth + delta, 1);
+  viewYear = d.getFullYear();
+  viewMonth = d.getMonth();
+  render();
+}
+
+function renderDay(todos: Todo[]) {
+  const title = dayFormatter.format(fromKey(selectedKey));
+  dayTitle.textContent = title.charAt(0).toUpperCase() + title.slice(1);
+  renderTodos([...todos].sort((a, b) => Number(a.isDone) - Number(b.isDone) || b.priority - a.priority));
+}
+
 function renderTodos(todos: Todo[]) {
   todoList.innerHTML = "";
   if (todos.length === 0) {
-    todoList.innerHTML = "<li>Задач нет</li>";
+    todoList.innerHTML = `<li class="empty">На этот день задач нет</li>`;
     return;
   }
 
@@ -259,12 +367,16 @@ todoForm.addEventListener("submit", async (e) => {
   const priority = Number(priorityInput.value) as Priority;
   const category = categoryInput.value.trim() || undefined;
 
-  await createTodo(titleInput.value.trim(), undefined, category, priority);
+  await createTodo(titleInput.value.trim(), undefined, category, priority, `${selectedKey}T00:00:00`);
   titleInput.value = "";
   categoryInput.value = "";
   priorityInput.value = "1";
   void loadTodos();
 });
+
+prevMonthBtn.addEventListener("click", () => shiftMonth(-1));
+nextMonthBtn.addEventListener("click", () => shiftMonth(1));
+todayBtn.addEventListener("click", () => selectDay(new Date()));
 
 filterBtn.addEventListener("click", () => void loadTodos());
 filterClearBtn.addEventListener("click", () => {

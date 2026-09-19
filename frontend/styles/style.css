@@ -181,3 +181,110 @@ td button {
 
 td button.unban { background: #0f6e56; }
 td button.ban { background: #b3261e; }
+
+main { max-width: 640px; }
+
+.calendar {
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.month-label {
+  flex: 1;
+  text-align: center;
+  font-weight: 600;
+}
+
+.nav-btn {
+  background: #f1f0eb;
+  color: #333;
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px 12px;
+}
+
+.today-btn {
+  background: #E1F5EE;
+  color: #0f6e56;
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
+.calendar-weekdays,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.calendar-weekdays span {
+  text-align: center;
+  font-size: 12px;
+  color: #999;
+  padding-bottom: 4px;
+}
+
+.day-cell {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: #fafaf8;
+  color: #333;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0;
+}
+
+.day-cell:hover { background: #f0efe9; opacity: 1; }
+.day-cell.weekend .day-num { color: #b3261e; }
+.day-cell.other-month { opacity: 0.35; }
+.day-cell.today { border-color: #0f6e56; }
+.day-cell.today .day-num { font-weight: 700; }
+.day-cell.selected { background: #0f6e56; }
+.day-cell.selected .day-num { color: white; }
+
+.day-num { font-size: 14px; }
+
+.day-count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  font-size: 11px;
+  line-height: 18px;
+  background: #FAEEDA;
+  color: #854F0B;
+}
+
+.day-count.all-done { background: #E1F5EE; color: #0F6E56; }
+.day-cell.selected .day-count { background: white; }
+
+.day-title {
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+
+li.empty { color: #999; border-bottom: none; }
+
+select {
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+
+@media (max-width: 480px) {
+  .day-num { font-size: 12px; }
+  .day-count { font-size: 10px; line-height: 16px; min-width: 16px; }
+}

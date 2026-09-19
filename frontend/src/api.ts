@@ -38,12 +38,13 @@ export async function createTodo(
   title: string,
   description: string | undefined,
   category: string | undefined,
-  priority: Priority
+  priority: Priority,
+  dueDate?: string
 ): Promise<Todo> {
   const res = await fetch(`${API_BASE}/todos`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ title, description, category, priority }),
+    body: JSON.stringify({ title, description, category, priority, dueDate }),
   });
   if (!res.ok) throw new Error("Не удалось создать задачу");
   return res.json();
