@@ -70,7 +70,7 @@ using (var scope = app.Services.CreateScope())
     db.Database.EnsureCreated();
 
     // EnsureCreated() does nothing when the DB file already exists, so tables added
-    // later (task progress notes) must be created explicitly. Idempotent.
+    // later (task progress notes, subtasks) must be created explicitly. Idempotent.
     db.Database.ExecuteSqlRaw("""
         CREATE TABLE IF NOT EXISTS "TodoProgressEntries" (
             "Id" TEXT NOT NULL CONSTRAINT "PK_TodoProgressEntries" PRIMARY KEY,
@@ -83,6 +83,18 @@ using (var scope = app.Services.CreateScope())
         );
         CREATE INDEX IF NOT EXISTS "IX_TodoProgressEntries_TodoItemId"
             ON "TodoProgressEntries" ("TodoItemId");
+        CREATE TABLE IF NOT EXISTS "TodoSubtasks" (
+            "Id" TEXT NOT NULL CONSTRAINT "PK_TodoSubtasks" PRIMARY KEY,
+            "TodoItemId" TEXT NOT NULL,
+            "Title" TEXT NOT NULL,
+            "IsDone" INTEGER NOT NULL,
+            "AuthorId" TEXT NOT NULL,
+            "CreatedAt" TEXT NOT NULL,
+            CONSTRAINT "FK_TodoSubtasks_Todos_TodoItemId"
+                FOREIGN KEY ("TodoItemId") REFERENCES "Todos" ("Id") ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS "IX_TodoSubtasks_TodoItemId"
+            ON "TodoSubtasks" ("TodoItemId");
         """);
 
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
@@ -177,4 +189,4 @@ app.Use(async (context, next) =>
 app.UseAuthorization();
 app.MapControllers();
 
-app.Run();
+app.Run();

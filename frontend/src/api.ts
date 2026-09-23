@@ -1,4 +1,4 @@
-import type { Todo, NewTodo, AuthResponse, AdminUser, Project, ProgressEntry } from "./types.js";
+import type { Todo, NewTodo, AuthResponse, AdminUser, Project, ProgressEntry, Subtask } from "./types.js";
 
 const API_BASE = "http://localhost:5001/api";
 
@@ -117,7 +117,7 @@ export async function deleteTodo(id: string): Promise<void> {
 
 export async function getProgress(todoId: string): Promise<ProgressEntry[]> {
   const res = await send(`${API_BASE}/todos/${todoId}/progress`, { headers: authHeaders() });
-  if (!res.ok) throw await readError(res, "Failed to load progress notes");
+  if (!res.ok) throw await readError(res, "Failed to load discussion");
   return res.json();
 }
 
@@ -127,8 +127,36 @@ export async function addProgress(todoId: string, text: string): Promise<Progres
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ text }),
   });
-  if (!res.ok) throw await readError(res, "Failed to add progress note");
+  if (!res.ok) throw await readError(res, "Failed to send message");
   return res.json();
+}
+
+export async function createSubtask(todoId: string, title: string): Promise<Subtask> {
+  const res = await send(`${API_BASE}/todos/${todoId}/subtasks`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ title }),
+  });
+  if (!res.ok) throw await readError(res, "Failed to add subtask");
+  return res.json();
+}
+
+export async function updateSubtask(subtask: Subtask): Promise<Subtask> {
+  const res = await send(`${API_BASE}/todos/${subtask.todoItemId}/subtasks/${subtask.id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ title: subtask.title, isDone: subtask.isDone }),
+  });
+  if (!res.ok) throw await readError(res, "Failed to update subtask");
+  return res.json();
+}
+
+export async function deleteSubtask(subtask: Subtask): Promise<void> {
+  const res = await send(`${API_BASE}/todos/${subtask.todoItemId}/subtasks/${subtask.id}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw await readError(res, "Failed to delete subtask");
 }
 
 export async function getProjects(): Promise<Project[]> {

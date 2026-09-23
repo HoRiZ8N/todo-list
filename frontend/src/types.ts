@@ -14,6 +14,16 @@ export interface Todo {
   projectId?: string | null;
   assigneeId?: string | null;
   assigneeEmail?: string | null;
+  subtasks: Subtask[];
+}
+
+export interface Subtask {
+  id: string;
+  todoItemId: string;
+  title: string;
+  isDone: boolean;
+  authorId: string;
+  createdAt: string;
 }
 
 export interface NewTodo {

@@ -15,6 +15,7 @@ public class TodosController : ControllerBase
     private const int MaxTitleLength = 200;
     private const int MaxDescriptionLength = 4000;
     private const int MaxProgressTextLength = 2000;
+    private const int MaxSubtaskCount = 50;
 
     private readonly AppDbContext _db;
 
@@ -68,8 +69,8 @@ public class TodosController : ControllerBase
         var error = Validate(dto.Title, dto.Description);
         if (error is not null) return BadRequest(error);
 
-        if (dto.ProjectId is { } pid && !await _db.ProjectsAccessibleBy(CurrentUserId).AnyAsync(p => p.Id == pid))
-            return Forbid();
+        if (!await CanAddTo(dto.ProjectId))
+            return StatusCode(StatusCodes.Status403Forbidden, "Only the project owner can add tasks");
 
         var todo = new TodoItem
         {
@@ -97,7 +98,8 @@ public class TodosController : ControllerBase
         var todo = await _db.Todos.FindAsync(id);
         if (todo is null) return NotFound();
         if (!await CanAccess(todo)) return Forbid();
-        if (dto.IsDone && !todo.IsDone && !await CanComplete(todo)) return Forbid();
+        if (!await CanEdit(todo))
+            return StatusCode(StatusCodes.Status403Forbidden, "Only the project owner can edit tasks");
 
         todo.Title = dto.Title.Trim();
         todo.Description = Normalize(dto.Description);
@@ -182,13 +184,13 @@ public class TodosController : ControllerBase
     {
         var text = dto.Text?.Trim() ?? "";
         if (text.Length == 0 || text.Length > MaxProgressTextLength)
-            return BadRequest($"Progress note must be 1-{MaxProgressTextLength} characters long");
+            return BadRequest($"Message must be 1-{MaxProgressTextLength} characters long");
 
         var todo = await _db.Todos.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id);
         if (todo is null) return NotFound();
         if (!await CanAccess(todo)) return Forbid();
-        if (todo.AssigneeId is null || todo.AssigneeId != CurrentUserId)
-            return Forbid();
+        if (todo.AssigneeId != CurrentUserId && !await CanEdit(todo))
+            return StatusCode(StatusCodes.Status403Forbidden, "Only the assignee and the project owner can write in the discussion");
 
         var entry = new TodoProgressEntry
         {
@@ -203,6 +205,82 @@ public class TodosController : ControllerBase
         return CreatedAtAction(nameof(GetProgress), new { id }, result);
     }
 
+    [HttpPost("{id:guid}/subtasks")]
+    public async Task<IActionResult> AddSubtask(Guid id, SubtaskCreateDto dto)
+    {
+        var error = ValidateSubtaskTitle(dto.Title);
+        if (error is not null) return BadRequest(error);
+
+        var todo = await _db.Todos.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id);
+        if (todo is null) return NotFound();
+        if (!await CanAccess(todo)) return Forbid();
+        if (!await CanAddTo(todo.ProjectId))
+            return StatusCode(StatusCodes.Status403Forbidden, "Only the project owner can add subtasks");
+        if (await _db.TodoSubtasks.CountAsync(s => s.TodoItemId == id) >= MaxSubtaskCount)
+            return BadRequest($"A task can have at most {MaxSubtaskCount} subtasks");
+
+        var subtask = new TodoSubtask
+        {
+            TodoItemId = id,
+            Title = dto.Title.Trim(),
+            AuthorId = CurrentUserId
+        };
+        _db.TodoSubtasks.Add(subtask);
+        await _db.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetById), new { id }, ToSubtaskDto(subtask));
+    }
+
+    [HttpPut("{id:guid}/subtasks/{subtaskId:guid}")]
+    public async Task<IActionResult> UpdateSubtask(Guid id, Guid subtaskId, SubtaskUpdateDto dto)
+    {
+        var error = ValidateSubtaskTitle(dto.Title);
+        if (error is not null) return BadRequest(error);
+
+        var subtask = await FindSubtask(id, subtaskId);
+        if (subtask is null) return NotFound();
+        if (!await CanAccess(subtask.TodoItem!)) return Forbid();
+        if (subtask.Title != dto.Title.Trim() && !await CanEdit(subtask.TodoItem!))
+            return StatusCode(StatusCodes.Status403Forbidden, "Only the project owner can rename subtasks");
+        if (subtask.IsDone != dto.IsDone && subtask.TodoItem!.AssigneeId != CurrentUserId && !await CanEdit(subtask.TodoItem!))
+            return StatusCode(StatusCodes.Status403Forbidden, "Only the assignee and the project owner can complete subtasks");
+
+        subtask.Title = dto.Title.Trim();
+        subtask.IsDone = dto.IsDone;
+        await _db.SaveChangesAsync();
+
+        return Ok(ToSubtaskDto(subtask));
+    }
+
+    [HttpDelete("{id:guid}/subtasks/{subtaskId:guid}")]
+    public async Task<IActionResult> DeleteSubtask(Guid id, Guid subtaskId)
+    {
+        var subtask = await FindSubtask(id, subtaskId);
+        if (subtask is null) return NotFound();
+        if (!await CanAccess(subtask.TodoItem!)) return Forbid();
+        if (subtask.AuthorId != CurrentUserId && !await CanDelete(subtask.TodoItem!)) return Forbid();
+
+        _db.TodoSubtasks.Remove(subtask);
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    private Task<TodoSubtask?> FindSubtask(Guid todoId, Guid subtaskId) =>
+        _db.TodoSubtasks
+            .Include(s => s.TodoItem)
+            .FirstOrDefaultAsync(s => s.Id == subtaskId && s.TodoItemId == todoId);
+
+    private static string? ValidateSubtaskTitle(string? title)
+    {
+        var trimmed = title?.Trim() ?? "";
+        return trimmed.Length == 0 || trimmed.Length > MaxTitleLength
+            ? $"Subtask title must be 1-{MaxTitleLength} characters long"
+            : null;
+    }
+
+    private static SubtaskDto ToSubtaskDto(TodoSubtask s) =>
+        new(s.Id, s.TodoItemId, s.Title, s.IsDone, s.AuthorId, s.CreatedAt);
+
     private async Task<bool> CanAccess(TodoItem todo)
     {
         if (IsAdmin) return true;
@@ -210,7 +288,13 @@ public class TodosController : ControllerBase
         return await _db.ProjectsAccessibleBy(CurrentUserId).AnyAsync(p => p.Id == pid);
     }
 
-    private async Task<bool> CanComplete(TodoItem todo)
+    private async Task<bool> CanAddTo(Guid? projectId)
+    {
+        if (projectId is not { } pid || IsAdmin) return true;
+        return await _db.Projects.AnyAsync(p => p.Id == pid && p.OwnerId == CurrentUserId);
+    }
+
+    private async Task<bool> CanEdit(TodoItem todo)
     {
         if (IsAdmin) return true;
         if (todo.ProjectId is not { } pid) return todo.UserId == CurrentUserId;
@@ -244,7 +328,11 @@ public class TodosController : ControllerBase
         join a in _db.Users on t.AssigneeId equals a.Id into assignees
         from a in assignees.DefaultIfEmpty()
         select new TodoDto(t.Id, t.Title, t.Description, t.IsDone, t.CreatedAt, t.DueDate, t.Category, t.Priority,
-            t.UserId, u == null ? "" : u.Email ?? "", t.ProjectId, t.AssigneeId, a == null ? null : a.Email);
+            t.UserId, u == null ? "" : u.Email ?? "", t.ProjectId, t.AssigneeId, a == null ? null : a.Email,
+            t.Subtasks
+                .OrderBy(s => s.CreatedAt)
+                .Select(s => new SubtaskDto(s.Id, s.TodoItemId, s.Title, s.IsDone, s.AuthorId, s.CreatedAt))
+                .ToList());
 
     private IQueryable<TodoProgressDto> ToProgressDto(IQueryable<TodoProgressEntry> query) =>
         from p in query

@@ -1,5 +1,17 @@
-import type { Todo, Priority, Project, ProgressEntry } from "./types.js";
-import { getTodos, createTodo, updateTodo, deleteTodo, claimTodo, releaseTodo, getProgress, addProgress } from "./api.js";
+import type { Todo, Priority, Project, ProgressEntry, Subtask } from "./types.js";
+import {
+  getTodos,
+  createTodo,
+  updateTodo,
+  deleteTodo,
+  claimTodo,
+  releaseTodo,
+  getProgress,
+  addProgress,
+  createSubtask,
+  updateSubtask,
+  deleteSubtask,
+} from "./api.js";
 import { errorText } from "./projects.js";
 
 type Scope = "day" | "all";
@@ -56,11 +68,18 @@ const progressEntries = new Map<string, ProgressEntry[]>();
 const progressLoading = new Set<string>();
 const progressError = new Map<string, string>();
 
-function resetProgressState() {
+const subtasksOpen = new Set<string>();
+let editingSubtask: string | null = null;
+let focusSubtaskInput: string | null = null;
+
+function resetPanelState() {
   progressOpen.clear();
   progressEntries.clear();
   progressLoading.clear();
   progressError.clear();
+  subtasksOpen.clear();
+  editingSubtask = null;
+  focusSubtaskInput = null;
 }
 
 function toKey(d: Date): string {
@@ -114,7 +133,7 @@ export function openBoard(project: Project, userId: string | null) {
   allFilter.value = "open";
   todoForm.reset();
   priorityInput.value = "1";
-  resetProgressState();
+  resetPanelState();
   selectDay(new Date());
   void loadTodos();
 }
@@ -123,7 +142,7 @@ export function closeBoard() {
   currentProject = null;
   allTodos = [];
   editing = null;
-  resetProgressState();
+  resetPanelState();
 }
 
 async function loadTodos() {
@@ -186,11 +205,26 @@ async function submitProgress(id: string, text: string) {
   render();
 }
 
+function toggleSubtasks(id: string) {
+  if (subtasksOpen.has(id)) subtasksOpen.delete(id);
+  else subtasksOpen.add(id);
+  render();
+}
+
 function render() {
+  todoForm.classList.toggle("hidden", !isProjectOwner());
   const byDay = groupByDay(allTodos);
   renderCalendar(byDay);
   renderDay(byDay.get(selectedKey) ?? []);
   renderAll();
+  restoreSubtaskFocus();
+}
+
+function restoreSubtaskFocus() {
+  if (!focusSubtaskInput) return;
+  const input = document.querySelector<HTMLInputElement>(`[data-subtask-input="${focusSubtaskInput}"]`);
+  focusSubtaskInput = null;
+  input?.focus();
 }
 
 function renderCalendar(byDay: Map<string, Todo[]>) {
@@ -318,7 +352,15 @@ function renderTodo(todo: Todo, scope: Scope): HTMLLIElement {
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
   checkbox.checked = todo.isDone;
-  checkbox.onchange = () => void runTodoAction(() => updateTodo({ ...todo, isDone: checkbox.checked }));
+  checkbox.disabled = !isProjectOwner();
+  checkbox.onchange = () => {
+    const open = todo.subtasks.filter((s) => !s.isDone).length;
+    if (checkbox.checked && open > 0 && !confirm(`${open} subtask(s) are still open. Mark the task as done anyway?`)) {
+      checkbox.checked = false;
+      return;
+    }
+    void runTodoAction(() => updateTodo({ ...todo, isDone: checkbox.checked }));
+  };
 
   const info = document.createElement("div");
   info.className = "todo-info";
@@ -348,6 +390,14 @@ function renderTodo(todo: Todo, scope: Scope): HTMLLIElement {
     meta.appendChild(date);
   }
 
+  if (todo.subtasks.length > 0) {
+    const done = todo.subtasks.filter((s) => s.isDone).length;
+    const counter = actionButton(`☑ ${done}/${todo.subtasks.length}`, "subtask-count", () => toggleSubtasks(todo.id));
+    counter.classList.toggle("complete", done === todo.subtasks.length);
+    counter.title = "Show subtasks";
+    meta.appendChild(counter);
+  }
+
   if (todo.category) meta.appendChild(badge("category", todo.category));
 
   if (todo.assigneeId) {
@@ -362,6 +412,10 @@ function renderTodo(todo: Todo, scope: Scope): HTMLLIElement {
 
   info.appendChild(meta);
 
+  if (subtasksOpen.has(todo.id)) {
+    info.appendChild(renderSubtaskPanel(todo, scope));
+  }
+
   if (progressOpen.has(todo.id)) {
     info.appendChild(renderProgressPanel(todo));
   }
@@ -375,16 +429,26 @@ function renderTodo(todo: Todo, scope: Scope): HTMLLIElement {
     actions.appendChild(actionButton("Release", "release", () => void runTodoAction(() => releaseTodo(todo.id))));
   }
 
+  if (isProjectOwner() || todo.subtasks.length > 0) {
+    actions.appendChild(actionButton(
+      subtasksOpen.has(todo.id) ? "Hide subtasks" : "Subtasks",
+      "subtasks-toggle",
+      () => toggleSubtasks(todo.id)
+    ));
+  }
+
   actions.appendChild(actionButton(
-    progressOpen.has(todo.id) ? "Hide progress" : "Progress",
+    progressOpen.has(todo.id) ? "Hide discussion" : "Discussion",
     "progress-toggle",
     () => toggleProgress(todo.id)
   ));
 
-  actions.appendChild(actionButton("Edit", "edit", () => {
-    editing = `${scope}:${todo.id}`;
-    render();
-  }));
+  if (isProjectOwner()) {
+    actions.appendChild(actionButton("Edit", "edit", () => {
+      editing = `${scope}:${todo.id}`;
+      render();
+    }));
+  }
 
   if (canDelete(todo)) {
     actions.appendChild(actionButton("Delete", "delete", () => {
@@ -396,13 +460,154 @@ function renderTodo(todo: Todo, scope: Scope): HTMLLIElement {
   return li;
 }
 
+function canDeleteSubtask(todo: Todo, subtask: Subtask): boolean {
+  return subtask.authorId === currentUserId || canDelete(todo);
+}
+
+function renderSubtaskPanel(todo: Todo, scope: Scope): HTMLDivElement {
+  const panel = document.createElement("div");
+  panel.className = "subtask-panel";
+
+  const heading = document.createElement("div");
+  heading.className = "progress-heading";
+  heading.textContent = "Subtasks";
+  panel.appendChild(heading);
+
+  if (todo.subtasks.length > 0) {
+    const done = todo.subtasks.filter((s) => s.isDone).length;
+    const bar = document.createElement("div");
+    bar.className = "subtask-bar";
+    const fill = document.createElement("div");
+    fill.className = "subtask-bar-fill";
+    fill.style.width = `${Math.round((done / todo.subtasks.length) * 100)}%`;
+    bar.appendChild(fill);
+    panel.appendChild(bar);
+
+    const list = document.createElement("ul");
+    list.className = "subtask-list";
+    for (const subtask of todo.subtasks) {
+      list.appendChild(editingSubtask === `${scope}:${subtask.id}` ? renderSubtaskEditor(subtask) : renderSubtask(todo, subtask, scope));
+    }
+    panel.appendChild(list);
+  }
+
+  if (isProjectOwner()) {
+    panel.appendChild(renderSubtaskForm(todo, scope));
+  } else if (todo.subtasks.length === 0) {
+    const status = document.createElement("p");
+    status.className = "progress-status";
+    status.textContent = "No subtasks";
+    panel.appendChild(status);
+  }
+
+  return panel;
+}
+
+function renderSubtask(todo: Todo, subtask: Subtask, scope: Scope): HTMLLIElement {
+  const li = document.createElement("li");
+  li.className = "subtask";
+  li.classList.toggle("done", subtask.isDone);
+
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.checked = subtask.isDone;
+  checkbox.disabled = !isProjectOwner() && todo.assigneeId !== currentUserId;
+  checkbox.onchange = () => void runTodoAction(() => updateSubtask({ ...subtask, isDone: checkbox.checked }));
+
+  const title = document.createElement("span");
+  title.className = "subtask-title";
+  title.textContent = subtask.title;
+  if (isProjectOwner()) {
+    title.title = "Double-click to rename";
+    title.ondblclick = () => {
+      editingSubtask = `${scope}:${subtask.id}`;
+      focusSubtaskInput = editingSubtask;
+      render();
+    };
+  }
+
+  li.append(checkbox, title);
+
+  if (canDeleteSubtask(todo, subtask)) {
+    const remove = actionButton("×", "subtask-delete", () => void runTodoAction(() => deleteSubtask(subtask)));
+    remove.title = "Delete subtask";
+    li.appendChild(remove);
+  }
+
+  return li;
+}
+
+function renderSubtaskEditor(subtask: Subtask): HTMLLIElement {
+  const li = document.createElement("li");
+  li.className = "subtask editing";
+
+  const input = document.createElement("input");
+  input.value = subtask.title;
+  input.maxLength = 200;
+  input.dataset.subtaskInput = editingSubtask ?? "";
+
+  let finished = false;
+  const finish = (save: boolean) => {
+    if (finished) return;
+    finished = true;
+    editingSubtask = null;
+    const title = input.value.trim();
+    if (save && title && title !== subtask.title) {
+      void runTodoAction(() => updateSubtask({ ...subtask, title }));
+    } else {
+      render();
+    }
+  };
+
+  input.onkeydown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      finish(true);
+    } else if (e.key === "Escape") {
+      finish(false);
+    }
+  };
+  input.onblur = () => finish(true);
+
+  li.appendChild(input);
+  return li;
+}
+
+function renderSubtaskForm(todo: Todo, scope: Scope): HTMLFormElement {
+  const form = document.createElement("form");
+  form.className = "subtask-form";
+
+  const key = `${scope}:${todo.id}`;
+  const input = document.createElement("input");
+  input.placeholder = "Add a subtask…";
+  input.maxLength = 200;
+  input.required = true;
+  input.dataset.subtaskInput = key;
+
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.textContent = "Add";
+
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    const title = input.value.trim();
+    if (!title) return;
+    input.value = "";
+    focusSubtaskInput = key;
+    void runTodoAction(() => createSubtask(todo.id, title));
+  };
+
+  form.append(input, submit);
+  return form;
+}
+
 function renderProgressPanel(todo: Todo): HTMLDivElement {
   const panel = document.createElement("div");
   panel.className = "progress-panel";
 
   const heading = document.createElement("div");
   heading.className = "progress-heading";
-  heading.textContent = "Progress notes";
+  heading.textContent = "Discussion";
   panel.appendChild(heading);
 
   if (progressLoading.has(todo.id)) {
@@ -420,14 +625,14 @@ function renderProgressPanel(todo: Todo): HTMLDivElement {
     if (entries.length === 0) {
       const status = document.createElement("p");
       status.className = "progress-status";
-      status.textContent = "No progress notes yet";
+      status.textContent = "No messages yet";
       panel.appendChild(status);
     } else {
       panel.appendChild(renderProgressList(entries));
     }
   }
 
-  if (todo.assigneeId && todo.assigneeId === currentUserId) {
+  if ((todo.assigneeId && todo.assigneeId === currentUserId) || isProjectOwner()) {
     panel.appendChild(renderProgressForm(todo));
   }
 
@@ -448,6 +653,7 @@ function renderProgressList(entries: ProgressEntry[]): HTMLUListElement {
     const author = document.createElement("span");
     author.className = "progress-author";
     author.textContent = entry.authorId === currentUserId ? "You" : entry.authorEmail;
+    if (entry.authorId === currentProject?.ownerId) author.appendChild(badge("owner", "owner"));
 
     const date = document.createElement("span");
     date.className = "progress-date";
@@ -471,14 +677,14 @@ function renderProgressForm(todo: Todo): HTMLFormElement {
   form.className = "progress-form";
 
   const textarea = document.createElement("textarea");
-  textarea.placeholder = "Describe your progress…";
+  textarea.placeholder = "Write a message…";
   textarea.maxLength = 2000;
   textarea.rows = 2;
   textarea.required = true;
 
   const submit = document.createElement("button");
   submit.type = "submit";
-  submit.textContent = "Add note";
+  submit.textContent = "Send";
 
   form.onsubmit = (e) => {
     e.preventDefault();

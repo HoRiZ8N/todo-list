@@ -67,6 +67,17 @@ class TodoItem
     string UserId;      // task author
     Guid? ProjectId;    // null = personal task
     string? AssigneeId; // user who took the task
+    List<TodoSubtask> Subtasks;
+}
+
+class TodoSubtask
+{
+    Guid Id;
+    Guid TodoItemId;    // parent task, cascade delete
+    string Title;
+    bool IsDone;
+    string AuthorId;
+    DateTime CreatedAt;
 }
 
 class Project
@@ -119,13 +130,19 @@ Notes on roles and access:
 | Action                                   | Project owner | Project member |
 |------------------------------------------|---------------|----------------|
 | View project, members and tasks          | ✓             | ✓              |
-| Create / edit / complete tasks           | ✓             | ✓              |
+| Create tasks                             | ✓             | —              |
+| Edit / complete tasks                    | ✓             | —              |
 | Delete a task                            | any task      | own tasks only |
 | Rename / delete project                  | ✓             | —              |
 | Add / remove members                     | ✓             | —              |
 | Leave project                            | —             | ✓              |
 | Take a free task                         | ✓             | ✓              |
 | Release a taken task                     | any task      | own only       |
+| Add subtasks                             | ✓             | —              |
+| Rename subtasks                          | ✓             | —              |
+| Check off subtasks                       | ✓             | assignee only  |
+| Write in a task discussion               | ✓             | assignee only  |
+| Delete a subtask                         | any subtask   | own subtasks, or any on own tasks |
 
 Members are added by email. Deleting a project deletes all its tasks. A task can be taken by one member at a time; taking is atomic, so a concurrent attempt gets `409 Conflict`. Removing a member from a project releases the tasks they had taken.
 
@@ -144,11 +161,18 @@ Members are added by email. Deleting a project deletes all its tasks. A task can
 |--------|------------------|-----------------------------------------------------------------------|---------------------------|
 | GET    | /api/todos       | Personal tasks, or project tasks with `?projectId=`; optional `?category=` | User, Admin |
 | GET    | /api/todos/{id}  | Get a task by id                                                   | User (own), Admin (any)    |
-| POST   | /api/todos       | Create a new task                                                  | User, Admin                 |
-| PUT    | /api/todos/{id}  | Update a task                                                      | User (own), Admin (any)    |
+| POST   | /api/todos       | Create a new task (project tasks: owner only)                      | User, Admin                 |
+| PUT    | /api/todos/{id}  | Update a task                                                      | Personal: author; project: owner; Admin |
 | DELETE | /api/todos/{id}  | Delete a task                                                      | User (own), Admin (any)    |
 | POST   | /api/todos/{id}/claim   | Take a task (`409` if taken by someone else)                | Project member             |
 | POST   | /api/todos/{id}/release | Release a task                                              | Assignee, project owner    |
+| POST   | /api/todos/{id}/subtasks              | Add a subtask `{ "title" }` (max 50 per task)  | Project owner (personal task: its author) |
+| PUT    | /api/todos/{id}/subtasks/{subtaskId}  | Rename / check off `{ "title", "isDone" }`     | Rename: project owner; check off: assignee, project owner |
+| DELETE | /api/todos/{id}/subtasks/{subtaskId}  | Delete a subtask                               | Subtask author, task author, project owner |
+| GET    | /api/todos/{id}/progress              | Task discussion messages                       | Anyone with access to the task |
+| POST   | /api/todos/{id}/progress              | Post a message `{ "text" }`                    | Assignee, project owner |
+
+Subtasks are returned inline in every `TodoDto` (`subtasks` array, ordered by creation time).
 
 **Projects** (`[Authorize]`)
 

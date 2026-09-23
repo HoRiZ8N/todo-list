@@ -634,6 +634,7 @@ li button.progress-toggle { background: #534AB7; }
 }
 
 .progress-author { font-weight: 600; color: #534AB7; }
+.progress-author .badge { margin-left: 6px; font-weight: 500; }
 
 .progress-text {
   margin: 2px 0 0;
@@ -662,4 +663,84 @@ li button.progress-toggle { background: #534AB7; }
 .progress-form button {
   align-self: flex-end;
   background: #534AB7;
+}
+
+li button.subtasks-toggle { background: #185FA5; }
+
+li button.subtask-count {
+  flex: none;
+  background: #E6F1FB;
+  color: #185FA5;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+li button.subtask-count.complete { background: #E1F5EE; color: #0F6E56; }
+
+.subtask-panel {
+  margin-top: 6px;
+  padding: 10px 12px;
+  background: #f6f9fc;
+  border: 1px solid #e3ecf5;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.subtask-bar {
+  height: 4px;
+  background: #e3ecf5;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.subtask-bar-fill {
+  height: 100%;
+  background: #0f6e56;
+  transition: width 0.2s;
+}
+
+.subtask-list { display: flex; flex-direction: column; }
+
+li.subtask {
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: none;
+  font-size: 13px;
+}
+
+li.subtask input[type=checkbox] { margin-top: 0; }
+
+.subtask-title { overflow-wrap: anywhere; cursor: text; }
+
+li.subtask button.subtask-delete {
+  flex: none;
+  background: transparent;
+  color: #999;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 6px;
+  visibility: hidden;
+}
+
+li.subtask:hover button.subtask-delete { visibility: visible; }
+li.subtask button.subtask-delete:hover { color: #b3261e; }
+
+li.subtask.editing input { padding: 4px 8px; font-size: 13px; }
+
+.subtask-form {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  flex-wrap: nowrap;
+}
+
+.subtask-form input { padding: 6px 10px; font-size: 13px; }
+.subtask-form button { background: #185FA5; font-size: 13px; padding: 6px 12px; }
+
+@media (hover: none) {
+  li.subtask button.subtask-delete { visibility: visible; }
 }
