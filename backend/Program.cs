@@ -69,6 +69,22 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
 
+    // EnsureCreated() does nothing when the DB file already exists, so tables added
+    // later (task progress notes) must be created explicitly. Idempotent.
+    db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS "TodoProgressEntries" (
+            "Id" TEXT NOT NULL CONSTRAINT "PK_TodoProgressEntries" PRIMARY KEY,
+            "TodoItemId" TEXT NOT NULL,
+            "AuthorId" TEXT NOT NULL,
+            "Text" TEXT NOT NULL,
+            "CreatedAt" TEXT NOT NULL,
+            CONSTRAINT "FK_TodoProgressEntries_Todos_TodoItemId"
+                FOREIGN KEY ("TodoItemId") REFERENCES "Todos" ("Id") ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS "IX_TodoProgressEntries_TodoItemId"
+            ON "TodoProgressEntries" ("TodoItemId");
+        """);
+
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
     foreach (var role in new[] { Roles.User, Roles.Admin })
     {

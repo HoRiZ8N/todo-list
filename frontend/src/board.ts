@@ -1,5 +1,5 @@
-import type { Todo, Priority, Project } from "./types.js";
-import { getTodos, createTodo, updateTodo, deleteTodo, claimTodo, releaseTodo } from "./api.js";
+import type { Todo, Priority, Project, ProgressEntry } from "./types.js";
+import { getTodos, createTodo, updateTodo, deleteTodo, claimTodo, releaseTodo, getProgress, addProgress } from "./api.js";
 import { errorText } from "./projects.js";
 
 type Scope = "day" | "all";
@@ -30,6 +30,7 @@ const dayTitle = byId<HTMLElement>("day-title");
 const monthFormatter = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric" });
 const dayFormatter = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", weekday: "long" });
 const shortDayFormatter = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
+const progressDateFormatter = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 const PRIORITY_LABELS: Record<Priority, string> = { 0: "Low", 1: "Medium", 2: "High" };
 const PRIORITY_CLASS: Record<Priority, string> = { 0: "prio-low", 1: "prio-medium", 2: "prio-high" };
@@ -50,6 +51,18 @@ let viewYear = new Date().getFullYear();
 let viewMonth = new Date().getMonth();
 let selectedKey = toKey(new Date());
 
+const progressOpen = new Set<string>();
+const progressEntries = new Map<string, ProgressEntry[]>();
+const progressLoading = new Set<string>();
+const progressError = new Map<string, string>();
+
+function resetProgressState() {
+  progressOpen.clear();
+  progressEntries.clear();
+  progressLoading.clear();
+  progressError.clear();
+}
+
 function toKey(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
@@ -61,10 +74,13 @@ function fromKey(key: string): Date {
   return new Date(y, m - 1, d);
 }
 
+function toUtcDate(iso: string): Date {
+  return new Date(/(Z|[+-]\d{2}:\d{2})$/.test(iso) ? iso : `${iso}Z`);
+}
+
 function todoKey(todo: Todo): string {
   if (todo.dueDate) return todo.dueDate.slice(0, 10);
-  const created = /(Z|[+-]\d{2}:\d{2})$/.test(todo.createdAt) ? todo.createdAt : `${todo.createdAt}Z`;
-  return toKey(new Date(created));
+  return toKey(toUtcDate(todo.createdAt));
 }
 
 function groupByDay(todos: Todo[]): Map<string, Todo[]> {
@@ -98,6 +114,7 @@ export function openBoard(project: Project, userId: string | null) {
   allFilter.value = "open";
   todoForm.reset();
   priorityInput.value = "1";
+  resetProgressState();
   selectDay(new Date());
   void loadTodos();
 }
@@ -106,6 +123,7 @@ export function closeBoard() {
   currentProject = null;
   allTodos = [];
   editing = null;
+  resetProgressState();
 }
 
 async function loadTodos() {
@@ -129,6 +147,43 @@ async function runTodoAction(action: () => Promise<unknown>) {
     todoError.textContent = errorText(e);
   }
   await loadTodos();
+}
+
+function toggleProgress(id: string) {
+  if (progressOpen.has(id)) {
+    progressOpen.delete(id);
+    render();
+    return;
+  }
+  progressOpen.add(id);
+  render();
+  if (!progressEntries.has(id)) void loadProgress(id);
+}
+
+async function loadProgress(id: string) {
+  progressLoading.add(id);
+  progressError.delete(id);
+  render();
+  try {
+    const entries = await getProgress(id);
+    progressEntries.set(id, entries);
+  } catch (e) {
+    progressError.set(id, errorText(e));
+  } finally {
+    progressLoading.delete(id);
+    render();
+  }
+}
+
+async function submitProgress(id: string, text: string) {
+  progressError.delete(id);
+  try {
+    const entry = await addProgress(id, text);
+    progressEntries.set(id, [...(progressEntries.get(id) ?? []), entry]);
+  } catch (e) {
+    progressError.set(id, errorText(e));
+  }
+  render();
 }
 
 function render() {
@@ -307,6 +362,10 @@ function renderTodo(todo: Todo, scope: Scope): HTMLLIElement {
 
   info.appendChild(meta);
 
+  if (progressOpen.has(todo.id)) {
+    info.appendChild(renderProgressPanel(todo));
+  }
+
   const actions = document.createElement("div");
   actions.className = "todo-actions";
 
@@ -315,6 +374,12 @@ function renderTodo(todo: Todo, scope: Scope): HTMLLIElement {
   } else if (todo.assigneeId && canRelease(todo)) {
     actions.appendChild(actionButton("Release", "release", () => void runTodoAction(() => releaseTodo(todo.id))));
   }
+
+  actions.appendChild(actionButton(
+    progressOpen.has(todo.id) ? "Hide progress" : "Progress",
+    "progress-toggle",
+    () => toggleProgress(todo.id)
+  ));
 
   actions.appendChild(actionButton("Edit", "edit", () => {
     editing = `${scope}:${todo.id}`;
@@ -329,6 +394,102 @@ function renderTodo(todo: Todo, scope: Scope): HTMLLIElement {
 
   li.append(checkbox, info, actions);
   return li;
+}
+
+function renderProgressPanel(todo: Todo): HTMLDivElement {
+  const panel = document.createElement("div");
+  panel.className = "progress-panel";
+
+  const heading = document.createElement("div");
+  heading.className = "progress-heading";
+  heading.textContent = "Progress notes";
+  panel.appendChild(heading);
+
+  if (progressLoading.has(todo.id)) {
+    const status = document.createElement("p");
+    status.className = "progress-status";
+    status.textContent = "Loading…";
+    panel.appendChild(status);
+  } else if (progressError.has(todo.id)) {
+    const status = document.createElement("p");
+    status.className = "progress-status error";
+    status.textContent = progressError.get(todo.id)!;
+    panel.appendChild(status);
+  } else {
+    const entries = progressEntries.get(todo.id) ?? [];
+    if (entries.length === 0) {
+      const status = document.createElement("p");
+      status.className = "progress-status";
+      status.textContent = "No progress notes yet";
+      panel.appendChild(status);
+    } else {
+      panel.appendChild(renderProgressList(entries));
+    }
+  }
+
+  if (todo.assigneeId && todo.assigneeId === currentUserId) {
+    panel.appendChild(renderProgressForm(todo));
+  }
+
+  return panel;
+}
+
+function renderProgressList(entries: ProgressEntry[]): HTMLUListElement {
+  const list = document.createElement("ul");
+  list.className = "progress-list";
+
+  for (const entry of entries) {
+    const item = document.createElement("li");
+    item.className = "progress-entry";
+
+    const head = document.createElement("div");
+    head.className = "progress-entry-head";
+
+    const author = document.createElement("span");
+    author.className = "progress-author";
+    author.textContent = entry.authorId === currentUserId ? "You" : entry.authorEmail;
+
+    const date = document.createElement("span");
+    date.className = "progress-date";
+    date.textContent = progressDateFormatter.format(toUtcDate(entry.createdAt));
+
+    head.append(author, date);
+
+    const text = document.createElement("p");
+    text.className = "progress-text";
+    text.textContent = entry.text;
+
+    item.append(head, text);
+    list.appendChild(item);
+  }
+
+  return list;
+}
+
+function renderProgressForm(todo: Todo): HTMLFormElement {
+  const form = document.createElement("form");
+  form.className = "progress-form";
+
+  const textarea = document.createElement("textarea");
+  textarea.placeholder = "Describe your progress…";
+  textarea.maxLength = 2000;
+  textarea.rows = 2;
+  textarea.required = true;
+
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.textContent = "Add note";
+
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    const text = textarea.value.trim();
+    if (!text) return;
+    textarea.value = "";
+    void submitProgress(todo.id, text);
+  };
+
+  form.append(textarea, submit);
+  return form;
 }
 
 function renderEditor(todo: Todo): HTMLLIElement {

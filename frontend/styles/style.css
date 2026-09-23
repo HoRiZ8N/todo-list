@@ -583,3 +583,83 @@ li button.delete { background: #b3261e; }
   .board { grid-template-columns: 1fr; }
   .board-right { position: static; max-height: none; }
 }
+
+li button.progress-toggle { background: #534AB7; }
+
+.progress-panel {
+  margin-top: 6px;
+  padding: 10px 12px;
+  background: #faf9f6;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progress-heading {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b6a63;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.progress-status {
+  margin: 0;
+  font-size: 13px;
+  color: #999;
+}
+
+.progress-status.error { color: #b3261e; }
+
+.progress-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progress-entry {
+  padding: 0;
+  border: none;
+  display: block;
+}
+
+.progress-entry-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: #999;
+}
+
+.progress-author { font-weight: 600; color: #534AB7; }
+
+.progress-text {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: #333;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.progress-form {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  flex-wrap: nowrap;
+}
+
+.progress-form textarea {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.progress-form button {
+  align-self: flex-end;
+  background: #534AB7;
+}

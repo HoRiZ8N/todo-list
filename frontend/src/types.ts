@@ -25,6 +25,15 @@ export interface NewTodo {
   projectId?: string;
 }
 
+export interface ProgressEntry {
+  id: string;
+  todoItemId: string;
+  authorId: string;
+  authorEmail: string;
+  text: string;
+  createdAt: string;
+}
+
 export interface ProjectMember {
   userId: string;
   email: string;

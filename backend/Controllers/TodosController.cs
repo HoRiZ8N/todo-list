@@ -170,8 +170,9 @@ public class TodosController : ControllerBase
         if (todo is null) return NotFound();
         if (!await CanAccess(todo)) return Forbid();
 
-        var entries = await ToProgressDto(_db.TodoProgressEntries.Where(p => p.TodoItemId == id))
-            .OrderBy(p => p.CreatedAt)
+        var entries = await ToProgressDto(_db.TodoProgressEntries
+                .Where(p => p.TodoItemId == id)
+                .OrderBy(p => p.CreatedAt))
             .ToListAsync();
         return Ok(entries);
     }
