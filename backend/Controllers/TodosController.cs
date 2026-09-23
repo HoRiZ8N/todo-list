@@ -14,6 +14,7 @@ public class TodosController : ControllerBase
 {
     private const int MaxTitleLength = 200;
     private const int MaxDescriptionLength = 4000;
+    private const int MaxProgressTextLength = 2000;
 
     private readonly AppDbContext _db;
 
@@ -96,6 +97,7 @@ public class TodosController : ControllerBase
         var todo = await _db.Todos.FindAsync(id);
         if (todo is null) return NotFound();
         if (!await CanAccess(todo)) return Forbid();
+        if (dto.IsDone && !todo.IsDone && !await CanComplete(todo)) return Forbid();
 
         todo.Title = dto.Title.Trim();
         todo.Description = Normalize(dto.Description);
@@ -161,11 +163,57 @@ public class TodosController : ControllerBase
         return Ok(await ToDto(_db.Todos.Where(t => t.Id == id)).FirstAsync());
     }
 
+    [HttpGet("{id:guid}/progress")]
+    public async Task<IActionResult> GetProgress(Guid id)
+    {
+        var todo = await _db.Todos.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id);
+        if (todo is null) return NotFound();
+        if (!await CanAccess(todo)) return Forbid();
+
+        var entries = await ToProgressDto(_db.TodoProgressEntries.Where(p => p.TodoItemId == id))
+            .OrderBy(p => p.CreatedAt)
+            .ToListAsync();
+        return Ok(entries);
+    }
+
+    [HttpPost("{id:guid}/progress")]
+    public async Task<IActionResult> AddProgress(Guid id, TodoProgressCreateDto dto)
+    {
+        var text = dto.Text?.Trim() ?? "";
+        if (text.Length == 0 || text.Length > MaxProgressTextLength)
+            return BadRequest($"Progress note must be 1-{MaxProgressTextLength} characters long");
+
+        var todo = await _db.Todos.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id);
+        if (todo is null) return NotFound();
+        if (!await CanAccess(todo)) return Forbid();
+        if (todo.AssigneeId is null || todo.AssigneeId != CurrentUserId)
+            return Forbid();
+
+        var entry = new TodoProgressEntry
+        {
+            TodoItemId = id,
+            AuthorId = CurrentUserId,
+            Text = text
+        };
+        _db.TodoProgressEntries.Add(entry);
+        await _db.SaveChangesAsync();
+
+        var result = await ToProgressDto(_db.TodoProgressEntries.Where(p => p.Id == entry.Id)).FirstAsync();
+        return CreatedAtAction(nameof(GetProgress), new { id }, result);
+    }
+
     private async Task<bool> CanAccess(TodoItem todo)
     {
         if (IsAdmin) return true;
         if (todo.ProjectId is not { } pid) return todo.UserId == CurrentUserId;
         return await _db.ProjectsAccessibleBy(CurrentUserId).AnyAsync(p => p.Id == pid);
+    }
+
+    private async Task<bool> CanComplete(TodoItem todo)
+    {
+        if (IsAdmin) return true;
+        if (todo.ProjectId is not { } pid) return todo.UserId == CurrentUserId;
+        return await _db.Projects.AnyAsync(p => p.Id == pid && p.OwnerId == CurrentUserId);
     }
 
     private async Task<bool> CanDelete(TodoItem todo)
@@ -196,4 +244,10 @@ public class TodosController : ControllerBase
         from a in assignees.DefaultIfEmpty()
         select new TodoDto(t.Id, t.Title, t.Description, t.IsDone, t.CreatedAt, t.DueDate, t.Category, t.Priority,
             t.UserId, u == null ? "" : u.Email ?? "", t.ProjectId, t.AssigneeId, a == null ? null : a.Email);
+
+    private IQueryable<TodoProgressDto> ToProgressDto(IQueryable<TodoProgressEntry> query) =>
+        from p in query
+        join u in _db.Users on p.AuthorId equals u.Id into authors
+        from u in authors.DefaultIfEmpty()
+        select new TodoProgressDto(p.Id, p.TodoItemId, p.AuthorId, u == null ? "" : u.Email ?? "", p.Text, p.CreatedAt);
 }

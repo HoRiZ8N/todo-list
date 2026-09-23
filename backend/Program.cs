@@ -98,6 +98,28 @@ using (var scope = app.Services.CreateScope())
             await userManager.AddToRoleAsync(existingAdmin, Roles.Admin);
         }
     }
+
+    var seedUsers = new[]
+    {
+        ("user1@gmail.com", "User123"),
+        ("user2@gmail.com", "User123"),
+        ("user3@gmail.com", "User123"),
+    };
+
+    var seedUserManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+    foreach (var (email, password) in seedUsers)
+    {
+        var existing = await seedUserManager.FindByEmailAsync(email);
+        if (existing is not null) continue;
+
+        var user = new AppUser { UserName = email, Email = email, EmailConfirmed = true };
+        var result = await seedUserManager.CreateAsync(user, password);
+        if (!result.Succeeded)
+            throw new InvalidOperationException(
+                $"Failed to seed user {email}: {string.Join("; ", result.Errors.Select(e => e.Description))}");
+
+        await seedUserManager.AddToRoleAsync(user, Roles.User);
+    }
 }
 
 if (app.Environment.IsDevelopment())

@@ -25,8 +25,22 @@ public class TodoItem
 
     public string? AssigneeId { get; set; }
     public AppUser? Assignee { get; set; }
+
+    public List<TodoProgressEntry> ProgressEntries { get; set; } = [];
+}
+
+public class TodoProgressEntry
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid TodoItemId { get; set; }
+    public TodoItem? TodoItem { get; set; }
+    public string AuthorId { get; set; } = string.Empty;
+    public string Text { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public record TodoCreateDto(string Title, string? Description, DateTime? DueDate, string? Category, TodoPriority Priority, Guid? ProjectId);
 public record TodoUpdateDto(string Title, string? Description, bool IsDone, DateTime? DueDate, string? Category, TodoPriority Priority);
 public record TodoDto(Guid Id, string Title, string? Description, bool IsDone, DateTime CreatedAt, DateTime? DueDate, string? Category, TodoPriority Priority, string UserId, string AuthorEmail, Guid? ProjectId, string? AssigneeId, string? AssigneeEmail);
+public record TodoProgressCreateDto(string Text);
+public record TodoProgressDto(Guid Id, Guid TodoItemId, string AuthorId, string AuthorEmail, string Text, DateTime CreatedAt);

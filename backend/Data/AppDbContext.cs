@@ -11,6 +11,7 @@ public class AppDbContext : IdentityDbContext<AppUser>
     public DbSet<TodoItem> Todos => Set<TodoItem>();
     public DbSet<Project> Projects => Set<Project>();
     public DbSet<ProjectMember> ProjectMembers => Set<ProjectMember>();
+    public DbSet<TodoProgressEntry> TodoProgressEntries => Set<TodoProgressEntry>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -51,6 +52,16 @@ public class AppDbContext : IdentityDbContext<AppUser>
             e.HasOne(t => t.Project)
                 .WithMany()
                 .HasForeignKey(t => t.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<TodoProgressEntry>(e =>
+        {
+            e.Property(p => p.Text).HasMaxLength(2000).IsRequired();
+            e.HasIndex(p => p.TodoItemId);
+            e.HasOne(p => p.TodoItem)
+                .WithMany(t => t.ProgressEntries)
+                .HasForeignKey(p => p.TodoItemId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }
