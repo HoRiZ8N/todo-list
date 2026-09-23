@@ -19,7 +19,11 @@ public class TodoItem
     public TodoPriority Priority { get; set; } = TodoPriority.Medium;
 
     public string UserId { get; set; } = string.Empty;
+
+    public Guid? ProjectId { get; set; }
+    public Project? Project { get; set; }
 }
 
-public record TodoCreateDto(string Title, string? Description, DateTime? DueDate, string? Category, TodoPriority Priority);
+public record TodoCreateDto(string Title, string? Description, DateTime? DueDate, string? Category, TodoPriority Priority, Guid? ProjectId);
 public record TodoUpdateDto(string Title, string? Description, bool IsDone, DateTime? DueDate, string? Category, TodoPriority Priority);
+public record TodoDto(Guid Id, string Title, string? Description, bool IsDone, DateTime CreatedAt, DateTime? DueDate, string? Category, TodoPriority Priority, string UserId, string AuthorEmail, Guid? ProjectId);

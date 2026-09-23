@@ -30,15 +30,24 @@ AuthController   → UserManager<AppUser> (ASP.NET Core Identity) → AppDbConte
 AdminController  → UserManager<AppUser> / AppDbContext
 ```
 
-- **TodosController** — CRUD for tasks; enforces that a regular user only ever sees/edits/deletes their own tasks, while an `Admin` can act on any task
+- **ProjectsController** — team projects: create/rename/delete a project, add/remove members (owner only), leave a project (member)
+- **TodosController** — CRUD for tasks; personal tasks are visible only to their author, project tasks to every project member
 - **AuthController** — registration and login; issues JWTs
 - **AdminController** — user management for admins: list users, list all tasks, ban/unban a user, delete a user
 - **JwtService** — builds and signs the JWT issued on login/registration
-- **AppDbContext** — `IdentityDbContext<AppUser>`, adds the `Todos` table
+- **AppDbContext** — `IdentityDbContext<AppUser>`, adds the `Todos`, `Projects` and `ProjectMembers` tables
 
 There is no separate service/repository layer at the moment — business rules (ownership checks, role checks) live directly in the controllers.
 
-The TypeScript frontend calls the API via `fetch` and updates the DOM without reloading the page. It includes a task list with category filtering, a due-date calendar view, and an admin panel for managing users.
+The TypeScript frontend calls the API via `fetch` and updates the DOM without reloading the page. Navigation uses hash routes:
+
+| Route                 | Page                                                              |
+|-----------------------|-------------------------------------------------------------------|
+| `#/`                  | Project list (projects the user owns or belongs to)               |
+| `#/projects/new`      | Project creation (name + optional member emails)                  |
+| `#/projects/{id}`     | Project page: members panel, category filter, calendar and tasks |
+
+Admins see only the users management panel.
 
 ## Data model
 
@@ -55,7 +64,24 @@ class TodoItem
     DateTime? DueDate;
     string? Category;
     TodoPriority Priority;
-    string UserId;      // task owner
+    string UserId;      // task author
+    Guid? ProjectId;    // null = personal task
+}
+
+class Project
+{
+    Guid Id;
+    string Name;
+    DateTime CreatedAt;
+    string OwnerId;
+    List<ProjectMember> Members;
+}
+
+class ProjectMember     // PK (ProjectId, UserId)
+{
+    Guid ProjectId;
+    string UserId;
+    DateTime AddedAt;
 }
 
 class AppUser : IdentityUser
@@ -70,7 +96,7 @@ Roles: `User` and `Admin`, stored via ASP.NET Core Identity's `IdentityRole`.
 
 | Role  | Permissions                                                       |
 |-------|---------------------------------------------------------------------|
-| User  | Sees and edits only their own tasks                                 |
+| User  | Sees and edits own personal tasks and tasks of projects they own or belong to |
 | Admin | Sees all tasks of all users; can list, ban/unban and delete users   |
 
 Authorization uses JWT: after logging in, the client receives a token containing the user's id and role (`ClaimTypes.Role`). The token is sent in the `Authorization: Bearer <token>` header with every request.
@@ -87,6 +113,19 @@ Notes on roles and access:
 - An `Admin` account is provisioned on startup from the `Admin:Email` / `Admin:Password` configuration (see [Running the project](#running-the-project)) — if it doesn't exist yet, it's created and given the `Admin` role.
 - A banned user (`IsBanned = true`) cannot log in (`403` on `POST /api/auth/login`) and, if they already hold a valid token, every subsequent authenticated request is rejected with `403` by a global middleware check.
 
+## Projects and team access
+
+| Action                                   | Project owner | Project member |
+|------------------------------------------|---------------|----------------|
+| View project, members and tasks          | ✓             | ✓              |
+| Create / edit / complete tasks           | ✓             | ✓              |
+| Delete a task                            | any task      | own tasks only |
+| Rename / delete project                  | ✓             | —              |
+| Add / remove members                     | ✓             | —              |
+| Leave project                            | —             | ✓              |
+
+Members are added by email. Deleting a project deletes all its tasks.
+
 ## API endpoints
 
 **Authentication**
@@ -100,11 +139,23 @@ Notes on roles and access:
 
 | Method | Path             | Description                                                        | Access                    |
 |--------|------------------|-----------------------------------------------------------------------|---------------------------|
-| GET    | /api/todos       | Get own tasks (all tasks for Admin); optional `?category=` filter | User, Admin                |
+| GET    | /api/todos       | Personal tasks, or project tasks with `?projectId=`; optional `?category=` | User, Admin |
 | GET    | /api/todos/{id}  | Get a task by id                                                   | User (own), Admin (any)    |
 | POST   | /api/todos       | Create a new task                                                  | User, Admin                 |
 | PUT    | /api/todos/{id}  | Update a task                                                      | User (own), Admin (any)    |
 | DELETE | /api/todos/{id}  | Delete a task                                                      | User (own), Admin (any)    |
+
+**Projects** (`[Authorize]`)
+
+| Method | Path                                   | Description                         | Access                   |
+|--------|----------------------------------------|-------------------------------------|--------------------------|
+| GET    | /api/projects                          | Projects the user owns or belongs to | User                    |
+| GET    | /api/projects/{id}                     | Project with members                | Owner, member            |
+| POST   | /api/projects                          | Create a project                    | User                     |
+| PUT    | /api/projects/{id}                     | Rename a project                    | Owner                    |
+| DELETE | /api/projects/{id}                     | Delete a project and its tasks      | Owner                    |
+| POST   | /api/projects/{id}/members             | Add a member by `{ "email" }`       | Owner                    |
+| DELETE | /api/projects/{id}/members/{userId}    | Remove a member / leave a project   | Owner, the member itself |
 
 **Administration** (`[Authorize(Roles = "Admin")]`)
 
@@ -125,13 +176,15 @@ todo-list/
 ├── backend/
 │   ├── Controllers/
 │   │   ├── TodosController.cs
+│   │   ├── ProjectsController.cs
 │   │   ├── AuthController.cs
 │   │   └── AdminController.cs
 │   ├── Services/
 │   │   ├── JwtService.cs
 │   │   └── AppIdentityErrorDescriber.cs
 │   ├── Models/
-│   │   ├── TodoItem.cs         # + TodoCreateDto / TodoUpdateDto
+│   │   ├── TodoItem.cs         # + TodoCreateDto / TodoUpdateDto / TodoDto
+│   │   ├── Project.cs          # + ProjectMember and project DTOs
 │   │   └── AppUser.cs          # + Roles, RegisterDto, LoginDto, AuthResponseDto, ErrorResponseDto, AdminUserDto
 │   ├── Data/
 │   │   └── AppDbContext.cs
@@ -148,6 +201,9 @@ todo-list/
 │       ├── api.ts
 │       ├── auth.ts
 │       ├── admin.ts
+│       ├── router.ts
+│       ├── projects.ts
+│       ├── board.ts
 │       ├── session.ts
 │       └── main.ts
 ├── docker-compose.yml
@@ -158,7 +214,7 @@ todo-list/
 
 The project is cross-platform: the .NET SDK, Node.js/TypeScript and Docker all work on macOS (including Apple Silicon — M1/M2/M3), Windows and Linux. Below are instructions for running without Docker (each part separately) and with Docker (the easiest way).
 
-The database schema is created automatically at startup via `Database.EnsureCreated()` — there are no EF Core migrations to apply manually.
+The database schema is created automatically at startup via `Database.EnsureCreated()` — there are no EF Core migrations to apply manually. `EnsureCreated()` does not update an existing database, so after schema changes the database has to be recreated (`docker compose down -v`).
 
 ### Backend
 

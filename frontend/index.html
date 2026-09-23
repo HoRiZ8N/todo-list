@@ -7,7 +7,13 @@
 </head>
 <body>
   <main>
-    <h1>Todo List</h1>
+    <div class="header">
+      <h1><a href="#/" class="home-link">Todo List</a></h1>
+      <div id="user-area" class="user-area hidden">
+        <span>Role: <strong id="role-label"></strong></span>
+        <button id="logout-btn">Log out</button>
+      </div>
+    </div>
 
     <section id="auth-section">
       <div id="login-view">
@@ -42,46 +48,94 @@
     </section>
 
     <section id="app-section" class="hidden">
-      <div class="header">
-        <span>Role: <strong id="role-label"></strong></span>
-        <button id="logout-btn">Log out</button>
+      <div id="projects-page" class="hidden">
+        <div class="page-head">
+          <h2 class="page-title">Projects</h2>
+          <a href="#/projects/new" class="button">New project</a>
+        </div>
+        <ul id="project-list" class="project-list"></ul>
       </div>
 
-      <div id="todos-tab">
-        <div class="filter-row">
-          <input id="category-filter" type="text" placeholder="Filter by category" />
-          <button type="button" id="filter-btn">Filter</button>
-          <button type="button" id="filter-clear-btn">Reset</button>
-        </div>
-
-        <div class="calendar">
-          <div class="calendar-nav">
-            <button type="button" id="prev-month" class="nav-btn" aria-label="Previous month">&lsaquo;</button>
-            <span id="month-label" class="month-label"></span>
-            <button type="button" id="next-month" class="nav-btn" aria-label="Next month">&rsaquo;</button>
-            <button type="button" id="today-btn" class="today-btn">Today</button>
+      <div id="project-create-page" class="hidden">
+        <a href="#/" class="back-link">&larr; All projects</a>
+        <h2 class="page-title">New project</h2>
+        <form id="project-create-form" class="stack-form">
+          <label for="project-name">Name</label>
+          <input id="project-name" type="text" placeholder="e.g. Backend API" maxlength="100" required />
+          <label for="project-members">Members (optional)</label>
+          <textarea id="project-members" rows="4" placeholder="One email per line"></textarea>
+          <p class="muted">You will be the project owner. Members can be added or removed later.</p>
+          <div class="form-actions">
+            <a href="#/" class="button secondary">Cancel</a>
+            <button type="submit">Create project</button>
           </div>
-          <div class="calendar-weekdays">
-            <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
-          </div>
-          <div id="calendar-grid" class="calendar-grid"></div>
+        </form>
+        <div id="project-create-error" class="error"></div>
+      </div>
+
+      <div id="project-page" class="hidden">
+        <a href="#/" class="back-link">&larr; All projects</a>
+        <div class="page-head">
+          <h2 id="project-title" class="page-title"></h2>
+          <button type="button" id="project-members-btn" class="secondary">Members</button>
         </div>
+        <div id="project-load-error" class="error"></div>
 
-        <div class="day-panel">
-          <h2 id="day-title" class="day-title"></h2>
+        <div id="project-body">
+          <div id="project-panel" class="project-panel hidden">
+            <div class="project-panel-head">
+              <strong>Members</strong>
+              <span id="project-owner-label" class="muted"></span>
+            </div>
+            <ul id="member-list" class="member-list"></ul>
+            <form id="member-add-form">
+              <input id="member-email" type="email" placeholder="Member email" required />
+              <button type="submit">Add member</button>
+            </form>
+            <div id="project-error" class="error"></div>
+            <div class="project-actions">
+              <button type="button" id="project-leave-btn" class="danger hidden">Leave project</button>
+              <button type="button" id="project-delete-btn" class="danger hidden">Delete project</button>
+            </div>
+          </div>
 
-          <form id="todo-form">
-            <input id="title" type="text" placeholder="New task for this day" required />
-            <input id="category" type="text" placeholder="Category (optional)" />
-            <select id="priority">
-              <option value="0">Low priority</option>
-              <option value="1" selected>Medium priority</option>
-              <option value="2">High priority</option>
-            </select>
-            <button type="submit">Add</button>
-          </form>
+          <div class="filter-row">
+            <input id="category-filter" type="text" placeholder="Filter by category" />
+            <button type="button" id="filter-btn">Filter</button>
+            <button type="button" id="filter-clear-btn">Reset</button>
+          </div>
 
-          <ul id="todo-list"></ul>
+          <div class="calendar">
+            <div class="calendar-nav">
+              <button type="button" id="prev-month" class="nav-btn" aria-label="Previous month">&lsaquo;</button>
+              <span id="month-label" class="month-label"></span>
+              <button type="button" id="next-month" class="nav-btn" aria-label="Next month">&rsaquo;</button>
+              <button type="button" id="today-btn" class="today-btn">Today</button>
+            </div>
+            <div class="calendar-weekdays">
+              <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+            </div>
+            <div id="calendar-grid" class="calendar-grid"></div>
+          </div>
+
+          <div class="day-panel">
+            <h2 id="day-title" class="day-title"></h2>
+
+            <form id="todo-form">
+              <input id="title" type="text" placeholder="New task for this day" maxlength="200" required />
+              <textarea id="description" placeholder="Description (optional)" maxlength="4000" rows="3"></textarea>
+              <input id="category" type="text" placeholder="Category (optional)" />
+              <select id="priority">
+                <option value="0">Low priority</option>
+                <option value="1" selected>Medium priority</option>
+                <option value="2">High priority</option>
+              </select>
+              <button type="submit">Add</button>
+            </form>
+
+            <div id="todo-error" class="error"></div>
+            <ul id="todo-list"></ul>
+          </div>
         </div>
       </div>
     </section>

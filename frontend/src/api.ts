@@ -1,4 +1,4 @@
-import type { Todo, AuthResponse, Priority, AdminUser } from "./types.js";
+import type { Todo, NewTodo, AuthResponse, AdminUser, Project } from "./types.js";
 
 const API_BASE = "http://localhost:5001/api";
 
@@ -59,45 +59,91 @@ export async function register(email: string, password: string): Promise<AuthRes
   return res.json();
 }
 
-export async function getTodos(category?: string): Promise<Todo[]> {
-  const url = category ? `${API_BASE}/todos?category=${encodeURIComponent(category)}` : `${API_BASE}/todos`;
-  const res = await fetch(url, { headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed to load tasks");
+export async function getTodos(projectId?: string, category?: string): Promise<Todo[]> {
+  const params = new URLSearchParams();
+  if (projectId) params.set("projectId", projectId);
+  if (category) params.set("category", category);
+  const query = params.toString();
+  const res = await send(`${API_BASE}/todos${query ? `?${query}` : ""}`, { headers: authHeaders() });
+  if (!res.ok) throw await readError(res, "Failed to load tasks");
   return res.json();
 }
 
-export async function createTodo(
-  title: string,
-  description: string | undefined,
-  category: string | undefined,
-  priority: Priority,
-  dueDate?: string
-): Promise<Todo> {
-  const res = await fetch(`${API_BASE}/todos`, {
+export async function createTodo(todo: NewTodo): Promise<Todo> {
+  const res = await send(`${API_BASE}/todos`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ title, description, category, priority, dueDate }),
+    body: JSON.stringify(todo),
   });
-  if (!res.ok) throw new Error("Failed to create task");
+  if (!res.ok) throw await readError(res, "Failed to create task");
   return res.json();
 }
 
 export async function updateTodo(todo: Todo): Promise<Todo> {
-  const res = await fetch(`${API_BASE}/todos/${todo.id}`, {
+  const res = await send(`${API_BASE}/todos/${todo.id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(todo),
   });
-  if (!res.ok) throw new Error("Failed to update task");
+  if (!res.ok) throw await readError(res, "Failed to update task");
   return res.json();
 }
 
 export async function deleteTodo(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/todos/${id}`, {
+  const res = await send(`${API_BASE}/todos/${id}`, {
     method: "DELETE",
     headers: authHeaders(),
   });
-  if (!res.ok) throw new Error("Failed to delete task");
+  if (!res.ok) throw await readError(res, "Failed to delete task");
+}
+
+export async function getProjects(): Promise<Project[]> {
+  const res = await send(`${API_BASE}/projects`, { headers: authHeaders() });
+  if (!res.ok) throw await readError(res, "Failed to load projects");
+  return res.json();
+}
+
+export async function getProject(id: string): Promise<Project> {
+  const res = await send(`${API_BASE}/projects/${id}`, { headers: authHeaders() });
+  if (res.status === 404) throw new ApiError("Project not found", ["It may have been deleted, or you are no longer a member"]);
+  if (!res.ok) throw await readError(res, "Failed to load project");
+  return res.json();
+}
+
+export async function createProject(name: string): Promise<Project> {
+  const res = await send(`${API_BASE}/projects`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw await readError(res, "Failed to create project");
+  return res.json();
+}
+
+export async function deleteProject(id: string): Promise<void> {
+  const res = await send(`${API_BASE}/projects/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw await readError(res, "Failed to delete project");
+}
+
+export async function addProjectMember(projectId: string, email: string): Promise<Project> {
+  const res = await send(`${API_BASE}/projects/${projectId}/members`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) throw await readError(res, "Failed to add member");
+  return res.json();
+}
+
+export async function removeProjectMember(projectId: string, userId: string): Promise<void> {
+  const res = await send(`${API_BASE}/projects/${projectId}/members/${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw await readError(res, "Failed to remove member");
 }
 
 export async function getUsers(): Promise<AdminUser[]> {
