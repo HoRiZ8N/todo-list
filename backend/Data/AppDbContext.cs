@@ -43,6 +43,11 @@ public class AppDbContext : IdentityDbContext<AppUser>
             e.Property(t => t.Title).HasMaxLength(200).IsRequired();
             e.Property(t => t.Description).HasMaxLength(4000);
             e.HasIndex(t => t.ProjectId);
+            e.HasIndex(t => t.AssigneeId);
+            e.HasOne(t => t.Assignee)
+                .WithMany()
+                .HasForeignKey(t => t.AssigneeId)
+                .OnDelete(DeleteBehavior.SetNull);
             e.HasOne(t => t.Project)
                 .WithMany()
                 .HasForeignKey(t => t.ProjectId)

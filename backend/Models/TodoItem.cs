@@ -22,8 +22,11 @@ public class TodoItem
 
     public Guid? ProjectId { get; set; }
     public Project? Project { get; set; }
+
+    public string? AssigneeId { get; set; }
+    public AppUser? Assignee { get; set; }
 }
 
 public record TodoCreateDto(string Title, string? Description, DateTime? DueDate, string? Category, TodoPriority Priority, Guid? ProjectId);
 public record TodoUpdateDto(string Title, string? Description, bool IsDone, DateTime? DueDate, string? Category, TodoPriority Priority);
-public record TodoDto(Guid Id, string Title, string? Description, bool IsDone, DateTime CreatedAt, DateTime? DueDate, string? Category, TodoPriority Priority, string UserId, string AuthorEmail, Guid? ProjectId);
+public record TodoDto(Guid Id, string Title, string? Description, bool IsDone, DateTime CreatedAt, DateTime? DueDate, string? Category, TodoPriority Priority, string UserId, string AuthorEmail, Guid? ProjectId, string? AssigneeId, string? AssigneeEmail);

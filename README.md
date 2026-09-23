@@ -45,7 +45,7 @@ The TypeScript frontend calls the API via `fetch` and updates the DOM without re
 |-----------------------|-------------------------------------------------------------------|
 | `#/`                  | Project list (projects the user owns or belongs to)               |
 | `#/projects/new`      | Project creation (name + optional member emails)                  |
-| `#/projects/{id}`     | Project page: members panel, category filter, calendar and tasks |
+| `#/projects/{id}`     | Project page: members panel; calendar with the selected day's tasks on the left, all project tasks (filter: open / taken by me / free to take / done / all) on the right |
 
 Admins see only the users management panel.
 
@@ -66,6 +66,7 @@ class TodoItem
     TodoPriority Priority;
     string UserId;      // task author
     Guid? ProjectId;    // null = personal task
+    string? AssigneeId; // user who took the task
 }
 
 class Project
@@ -123,8 +124,10 @@ Notes on roles and access:
 | Rename / delete project                  | ✓             | —              |
 | Add / remove members                     | ✓             | —              |
 | Leave project                            | —             | ✓              |
+| Take a free task                         | ✓             | ✓              |
+| Release a taken task                     | any task      | own only       |
 
-Members are added by email. Deleting a project deletes all its tasks.
+Members are added by email. Deleting a project deletes all its tasks. A task can be taken by one member at a time; taking is atomic, so a concurrent attempt gets `409 Conflict`. Removing a member from a project releases the tasks they had taken.
 
 ## API endpoints
 
@@ -144,6 +147,8 @@ Members are added by email. Deleting a project deletes all its tasks.
 | POST   | /api/todos       | Create a new task                                                  | User, Admin                 |
 | PUT    | /api/todos/{id}  | Update a task                                                      | User (own), Admin (any)    |
 | DELETE | /api/todos/{id}  | Delete a task                                                      | User (own), Admin (any)    |
+| POST   | /api/todos/{id}/claim   | Take a task (`409` if taken by someone else)                | Project member             |
+| POST   | /api/todos/{id}/release | Release a task                                              | Assignee, project owner    |
 
 **Projects** (`[Authorize]`)
 

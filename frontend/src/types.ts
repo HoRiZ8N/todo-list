@@ -12,6 +12,8 @@ export interface Todo {
   userId: string;
   authorEmail: string;
   projectId?: string | null;
+  assigneeId?: string | null;
+  assigneeEmail?: string | null;
 }
 
 export interface NewTodo {

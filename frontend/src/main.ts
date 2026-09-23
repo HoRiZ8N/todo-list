@@ -13,6 +13,7 @@ import {
 import { parseRoute, routes, type Route } from "./router.js";
 import { loadSession, saveSession, clearSession, type Session } from "./session.js";
 
+const mainEl = document.querySelector("main")!;
 const authSection = document.getElementById("auth-section")!;
 const appSection = document.getElementById("app-section")!;
 const userArea = document.getElementById("user-area")!;
@@ -36,6 +37,7 @@ let routeVersion = 0;
 
 function showPage(page: keyof typeof pages | null) {
   for (const [name, el] of Object.entries(pages)) el.classList.toggle("hidden", name !== page);
+  mainEl.classList.toggle("wide", page === "project");
 }
 
 async function handleRoute() {

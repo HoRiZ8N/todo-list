@@ -122,6 +122,11 @@ public class ProjectsController : ControllerBase
 
         _db.ProjectMembers.Remove(member);
         await _db.SaveChangesAsync();
+
+        await _db.Todos
+            .Where(t => t.ProjectId == id && t.AssigneeId == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.AssigneeId, (string?)null));
+
         return NoContent();
     }
 

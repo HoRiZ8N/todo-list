@@ -89,6 +89,24 @@ export async function updateTodo(todo: Todo): Promise<Todo> {
   return res.json();
 }
 
+export async function claimTodo(id: string): Promise<Todo> {
+  const res = await send(`${API_BASE}/todos/${id}/claim`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw await readError(res, "Failed to take task");
+  return res.json();
+}
+
+export async function releaseTodo(id: string): Promise<Todo> {
+  const res = await send(`${API_BASE}/todos/${id}/release`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw await readError(res, "Failed to release task");
+  return res.json();
+}
+
 export async function deleteTodo(id: string): Promise<void> {
   const res = await send(`${API_BASE}/todos/${id}`, {
     method: "DELETE",

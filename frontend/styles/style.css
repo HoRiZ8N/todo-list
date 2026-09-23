@@ -490,3 +490,96 @@ a.button.secondary { background: #6b6a63; }
   gap: 8px;
   margin-top: 8px;
 }
+
+main.wide { max-width: 1180px; }
+
+#todo-error:not(:empty) { margin-bottom: 12px; }
+
+.board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.board-right {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.all-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.all-head .day-title { margin: 0; }
+
+.all-head select { padding: 6px 8px; font-size: 13px; }
+
+.count-pill {
+  display: inline-block;
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  background: #f1f0eb;
+  color: #666;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 22px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.all-list {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.all-list li:last-child { border-bottom: none; }
+
+li.mine { box-shadow: inset 3px 0 0 #0f6e56; padding-left: 8px; }
+
+.todo-title { flex: 1; overflow-wrap: anywhere; }
+
+.todo-description.clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.badge.assignee { background: #E6F1FB; color: #185FA5; }
+.badge.assignee.mine { background: #0f6e56; color: white; }
+
+li.done .badge { text-decoration: none; }
+
+li button.date-link {
+  background: #f1f0eb;
+  color: #333;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+li button.take { background: #0f6e56; }
+li button.release { background: #854F0B; }
+li button.delete { background: #b3261e; }
+
+.todo-actions button { min-width: 64px; }
+
+.todo-editor select { flex: none; }
+.todo-editor input:nth-of-type(2) { flex: 1 1 auto; }
+
+@media (max-width: 900px) {
+  .board { grid-template-columns: 1fr; }
+  .board-right { position: static; max-height: none; }
+}

@@ -120,6 +120,47 @@ public class TodosController : ControllerBase
         return NoContent();
     }
 
+    [HttpPost("{id:guid}/claim")]
+    public async Task<IActionResult> Claim(Guid id)
+    {
+        var todo = await _db.Todos.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id);
+        if (todo is null) return NotFound();
+        if (!await CanAccess(todo)) return Forbid();
+        if (todo.ProjectId is null) return BadRequest("Only project tasks can be taken");
+        if (todo.IsDone) return BadRequest("Task is already done");
+
+        var me = CurrentUserId;
+        var updated = await _db.Todos
+            .Where(t => t.Id == id && (t.AssigneeId == null || t.AssigneeId == me))
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.AssigneeId, me));
+
+        if (updated == 0)
+        {
+            var taken = await ToDto(_db.Todos.Where(t => t.Id == id)).FirstAsync();
+            return Conflict($"Task is already taken by {taken.AssigneeEmail}");
+        }
+
+        return Ok(await ToDto(_db.Todos.Where(t => t.Id == id)).FirstAsync());
+    }
+
+    [HttpPost("{id:guid}/release")]
+    public async Task<IActionResult> Release(Guid id)
+    {
+        var todo = await _db.Todos.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id);
+        if (todo is null) return NotFound();
+        if (!await CanAccess(todo)) return Forbid();
+
+        if (todo.AssigneeId is not null && todo.AssigneeId != CurrentUserId && !IsAdmin &&
+            !await _db.Projects.AnyAsync(p => p.Id == todo.ProjectId && p.OwnerId == CurrentUserId))
+            return Forbid();
+
+        await _db.Todos
+            .Where(t => t.Id == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.AssigneeId, (string?)null));
+
+        return Ok(await ToDto(_db.Todos.Where(t => t.Id == id)).FirstAsync());
+    }
+
     private async Task<bool> CanAccess(TodoItem todo)
     {
         if (IsAdmin) return true;
@@ -151,6 +192,8 @@ public class TodosController : ControllerBase
         from t in query
         join u in _db.Users on t.UserId equals u.Id into authors
         from u in authors.DefaultIfEmpty()
+        join a in _db.Users on t.AssigneeId equals a.Id into assignees
+        from a in assignees.DefaultIfEmpty()
         select new TodoDto(t.Id, t.Title, t.Description, t.IsDone, t.CreatedAt, t.DueDate, t.Category, t.Priority,
-            t.UserId, u == null ? "" : u.Email ?? "", t.ProjectId);
+            t.UserId, u == null ? "" : u.Email ?? "", t.ProjectId, t.AssigneeId, a == null ? null : a.Email);
 }

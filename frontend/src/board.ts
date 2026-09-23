@@ -1,30 +1,51 @@
 import type { Todo, Priority, Project } from "./types.js";
-import { getTodos, createTodo, updateTodo, deleteTodo } from "./api.js";
+import { getTodos, createTodo, updateTodo, deleteTodo, claimTodo, releaseTodo } from "./api.js";
+import { errorText } from "./projects.js";
 
-const todoForm = document.getElementById("todo-form") as HTMLFormElement;
-const titleInput = document.getElementById("title") as HTMLInputElement;
-const descriptionInput = document.getElementById("description") as HTMLTextAreaElement;
-const todoError = document.getElementById("todo-error")!;
-const categoryInput = document.getElementById("category") as HTMLInputElement;
-const priorityInput = document.getElementById("priority") as HTMLSelectElement;
-const categoryFilterInput = document.getElementById("category-filter") as HTMLInputElement;
-const filterBtn = document.getElementById("filter-btn")!;
-const filterClearBtn = document.getElementById("filter-clear-btn")!;
-const todoList = document.getElementById("todo-list")!;
-const calendarGrid = document.getElementById("calendar-grid")!;
-const monthLabel = document.getElementById("month-label")!;
-const prevMonthBtn = document.getElementById("prev-month")!;
-const nextMonthBtn = document.getElementById("next-month")!;
-const todayBtn = document.getElementById("today-btn")!;
-const dayTitle = document.getElementById("day-title")!;
+type Scope = "day" | "all";
+type ListFilter = "all" | "open" | "mine" | "unassigned" | "done";
+
+const byId = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+
+const todoForm = byId<HTMLFormElement>("todo-form");
+const titleInput = byId<HTMLInputElement>("title");
+const descriptionInput = byId<HTMLTextAreaElement>("description");
+const categoryInput = byId<HTMLInputElement>("category");
+const priorityInput = byId<HTMLSelectElement>("priority");
+const todoError = byId<HTMLElement>("todo-error");
+const categoryFilterInput = byId<HTMLInputElement>("category-filter");
+const filterBtn = byId<HTMLButtonElement>("filter-btn");
+const filterClearBtn = byId<HTMLButtonElement>("filter-clear-btn");
+const dayList = byId<HTMLUListElement>("todo-list");
+const allList = byId<HTMLUListElement>("all-todo-list");
+const allFilter = byId<HTMLSelectElement>("all-filter");
+const allCount = byId<HTMLElement>("all-count");
+const calendarGrid = byId<HTMLElement>("calendar-grid");
+const monthLabel = byId<HTMLElement>("month-label");
+const prevMonthBtn = byId<HTMLButtonElement>("prev-month");
+const nextMonthBtn = byId<HTMLButtonElement>("next-month");
+const todayBtn = byId<HTMLButtonElement>("today-btn");
+const dayTitle = byId<HTMLElement>("day-title");
 
 const monthFormatter = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric" });
 const dayFormatter = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", weekday: "long" });
+const shortDayFormatter = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
+
+const PRIORITY_LABELS: Record<Priority, string> = { 0: "Low", 1: "Medium", 2: "High" };
+const PRIORITY_CLASS: Record<Priority, string> = { 0: "prio-low", 1: "prio-medium", 2: "prio-high" };
+
+const LIST_FILTERS: Record<ListFilter, (todo: Todo, userId: string | null) => boolean> = {
+  all: () => true,
+  open: (t) => !t.isDone,
+  mine: (t, userId) => t.assigneeId === userId,
+  unassigned: (t) => !t.isDone && !t.assigneeId,
+  done: (t) => t.isDone,
+};
 
 let allTodos: Todo[] = [];
 let currentProject: Project | null = null;
 let currentUserId: string | null = null;
-let editingId: string | null = null;
+let editing: string | null = null;
 let viewYear = new Date().getFullYear();
 let viewMonth = new Date().getMonth();
 let selectedKey = toKey(new Date());
@@ -57,19 +78,24 @@ function groupByDay(todos: Todo[]): Map<string, Todo[]> {
   return map;
 }
 
-const PRIORITY_LABELS: Record<Priority, string> = { 0: "Low", 1: "Medium", 2: "High" };
-const PRIORITY_CLASS: Record<Priority, string> = { 0: "prio-low", 1: "prio-medium", 2: "prio-high" };
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
 export function openBoard(project: Project, userId: string | null) {
   const switched = currentProject?.id !== project.id;
   currentProject = project;
   currentUserId = userId;
-  if (!switched) return;
+  if (!switched) {
+    render();
+    return;
+  }
 
   allTodos = [];
-  editingId = null;
+  editing = null;
   todoError.textContent = "";
   categoryFilterInput.value = "";
+  allFilter.value = "open";
   todoForm.reset();
   priorityInput.value = "1";
   selectDay(new Date());
@@ -79,34 +105,41 @@ export function openBoard(project: Project, userId: string | null) {
 export function closeBoard() {
   currentProject = null;
   allTodos = [];
-  editingId = null;
+  editing = null;
 }
 
 async function loadTodos() {
-  if (!currentProject) return;
-  todoList.innerHTML = "<li>Loading...</li>";
+  const project = currentProject;
+  if (!project) return;
   try {
-    const category = categoryFilterInput.value.trim() || undefined;
-    allTodos = await getTodos(currentProject.id, category);
+    const todos = await getTodos(project.id, categoryFilterInput.value.trim() || undefined);
+    if (project !== currentProject) return;
+    allTodos = todos;
     render();
   } catch (e) {
-    todoList.innerHTML = "";
-    const li = document.createElement("li");
-    li.className = "error";
-    li.textContent = (e as Error).message;
-    todoList.appendChild(li);
+    todoError.textContent = errorText(e);
   }
+}
+
+async function runTodoAction(action: () => Promise<unknown>) {
+  todoError.textContent = "";
+  try {
+    await action();
+  } catch (e) {
+    todoError.textContent = errorText(e);
+  }
+  await loadTodos();
 }
 
 function render() {
   const byDay = groupByDay(allTodos);
   renderCalendar(byDay);
   renderDay(byDay.get(selectedKey) ?? []);
+  renderAll();
 }
 
 function renderCalendar(byDay: Map<string, Todo[]>) {
-  const label = monthFormatter.format(new Date(viewYear, viewMonth, 1));
-  monthLabel.textContent = label.charAt(0).toUpperCase() + label.slice(1);
+  monthLabel.textContent = capitalize(monthFormatter.format(new Date(viewYear, viewMonth, 1)));
 
   const offset = (new Date(viewYear, viewMonth, 1).getDay() + 6) % 7;
   const todayKey = toKey(new Date());
@@ -158,42 +191,74 @@ function shiftMonth(delta: number) {
   render();
 }
 
+function sortTodos(todos: Todo[]): Todo[] {
+  return [...todos].sort(
+    (a, b) =>
+      Number(a.isDone) - Number(b.isDone) ||
+      todoKey(a).localeCompare(todoKey(b)) ||
+      b.priority - a.priority ||
+      a.title.localeCompare(b.title)
+  );
+}
+
 function renderDay(todos: Todo[]) {
-  const title = dayFormatter.format(fromKey(selectedKey));
-  dayTitle.textContent = title.charAt(0).toUpperCase() + title.slice(1);
-  renderTodos([...todos].sort((a, b) => Number(a.isDone) - Number(b.isDone) || b.priority - a.priority));
+  dayTitle.textContent = capitalize(dayFormatter.format(fromKey(selectedKey)));
+  renderList(dayList, "day", sortTodos(todos), "No tasks for this day");
 }
 
-function canDelete(todo: Todo, project: Project | null): boolean {
-  return todo.userId === currentUserId || project?.isOwner === true;
+function renderAll() {
+  const filter = LIST_FILTERS[allFilter.value as ListFilter] ?? LIST_FILTERS.all;
+  const todos = sortTodos(allTodos.filter((t) => filter(t, currentUserId)));
+  allCount.textContent = String(todos.length);
+  renderList(allList, "all", todos, "No tasks");
 }
 
-async function runTodoAction(action: () => Promise<unknown>) {
-  todoError.textContent = "";
-  try {
-    await action();
-  } catch (e) {
-    todoError.textContent = (e as Error).message;
-  }
-  void loadTodos();
-}
-
-function renderTodos(todos: Todo[]) {
-  todoList.innerHTML = "";
+function renderList(list: HTMLUListElement, scope: Scope, todos: Todo[], emptyText: string) {
+  list.innerHTML = "";
   if (todos.length === 0) {
-    todoList.innerHTML = `<li class="empty">No tasks for this day</li>`;
+    const li = document.createElement("li");
+    li.className = "empty";
+    li.textContent = emptyText;
+    list.appendChild(li);
     return;
   }
-
-  const project = currentProject;
   for (const todo of todos) {
-    todoList.appendChild(todo.id === editingId ? renderEditor(todo) : renderTodo(todo, project));
+    list.appendChild(editing === `${scope}:${todo.id}` ? renderEditor(todo) : renderTodo(todo, scope));
   }
 }
 
-function renderTodo(todo: Todo, project: Project | null): HTMLLIElement {
+function isProjectOwner(): boolean {
+  return currentProject?.isOwner === true;
+}
+
+function canDelete(todo: Todo): boolean {
+  return todo.userId === currentUserId || isProjectOwner();
+}
+
+function canRelease(todo: Todo): boolean {
+  return todo.assigneeId === currentUserId || isProjectOwner();
+}
+
+function badge(className: string, text: string): HTMLSpanElement {
+  const span = document.createElement("span");
+  span.className = `badge ${className}`;
+  span.textContent = text;
+  return span;
+}
+
+function actionButton(text: string, className: string, onClick: () => void): HTMLButtonElement {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = className;
+  btn.textContent = text;
+  btn.onclick = onClick;
+  return btn;
+}
+
+function renderTodo(todo: Todo, scope: Scope): HTMLLIElement {
   const li = document.createElement("li");
-  li.className = todo.isDone ? "done" : "";
+  li.classList.toggle("done", todo.isDone);
+  li.classList.toggle("mine", todo.assigneeId === currentUserId);
 
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
@@ -205,21 +270,15 @@ function renderTodo(todo: Todo, project: Project | null): HTMLLIElement {
 
   const titleRow = document.createElement("div");
   titleRow.className = "todo-title-row";
-
-  const span = document.createElement("span");
-  span.textContent = todo.title;
-  titleRow.appendChild(span);
-
-  const prioBadge = document.createElement("span");
-  prioBadge.className = `badge ${PRIORITY_CLASS[todo.priority]}`;
-  prioBadge.textContent = PRIORITY_LABELS[todo.priority];
-  titleRow.appendChild(prioBadge);
-
+  const title = document.createElement("span");
+  title.className = "todo-title";
+  title.textContent = todo.title;
+  titleRow.append(title, badge(PRIORITY_CLASS[todo.priority], PRIORITY_LABELS[todo.priority]));
   info.appendChild(titleRow);
 
   if (todo.description) {
     const desc = document.createElement("p");
-    desc.className = "todo-description";
+    desc.className = scope === "all" ? "todo-description clamp" : "todo-description";
     desc.textContent = todo.description;
     info.appendChild(desc);
   }
@@ -227,41 +286,45 @@ function renderTodo(todo: Todo, project: Project | null): HTMLLIElement {
   const meta = document.createElement("div");
   meta.className = "todo-meta";
 
-  if (todo.category) {
-    const catBadge = document.createElement("span");
-    catBadge.className = "badge category";
-    catBadge.textContent = todo.category;
-    meta.appendChild(catBadge);
+  if (scope === "all") {
+    const key = todoKey(todo);
+    const date = actionButton(shortDayFormatter.format(fromKey(key)), "date-link", () => selectDay(fromKey(key)));
+    date.title = "Show in calendar";
+    meta.appendChild(date);
   }
 
-  if (project) {
-    const author = document.createElement("span");
-    author.className = "todo-author";
-    author.textContent = todo.userId === currentUserId ? "by you" : `by ${todo.authorEmail}`;
-    meta.appendChild(author);
+  if (todo.category) meta.appendChild(badge("category", todo.category));
+
+  if (todo.assigneeId) {
+    const mine = todo.assigneeId === currentUserId;
+    meta.appendChild(badge(mine ? "assignee mine" : "assignee", mine ? "Taken by you" : `Taken by ${todo.assigneeEmail ?? "unknown"}`));
   }
 
-  if (meta.childElementCount > 0) info.appendChild(meta);
+  const author = document.createElement("span");
+  author.className = "todo-author";
+  author.textContent = todo.userId === currentUserId ? "created by you" : `created by ${todo.authorEmail}`;
+  meta.appendChild(author);
+
+  info.appendChild(meta);
 
   const actions = document.createElement("div");
   actions.className = "todo-actions";
 
-  const editBtn = document.createElement("button");
-  editBtn.type = "button";
-  editBtn.className = "edit";
-  editBtn.textContent = "Edit";
-  editBtn.onclick = () => {
-    editingId = todo.id;
-    render();
-  };
-  actions.appendChild(editBtn);
+  if (!todo.assigneeId && !todo.isDone) {
+    actions.appendChild(actionButton("Take", "take", () => void runTodoAction(() => claimTodo(todo.id))));
+  } else if (todo.assigneeId && canRelease(todo)) {
+    actions.appendChild(actionButton("Release", "release", () => void runTodoAction(() => releaseTodo(todo.id))));
+  }
 
-  if (canDelete(todo, project)) {
-    const delBtn = document.createElement("button");
-    delBtn.type = "button";
-    delBtn.textContent = "Delete";
-    delBtn.onclick = () => void runTodoAction(() => deleteTodo(todo.id));
-    actions.appendChild(delBtn);
+  actions.appendChild(actionButton("Edit", "edit", () => {
+    editing = `${scope}:${todo.id}`;
+    render();
+  }));
+
+  if (canDelete(todo)) {
+    actions.appendChild(actionButton("Delete", "delete", () => {
+      if (confirm(`Delete task "${todo.title}"?`)) void runTodoAction(() => deleteTodo(todo.id));
+    }));
   }
 
   li.append(checkbox, info, actions);
@@ -277,6 +340,7 @@ function renderEditor(todo: Todo): HTMLLIElement {
 
   const title = document.createElement("input");
   title.value = todo.title;
+  title.placeholder = "Title";
   title.maxLength = 200;
   title.required = true;
 
@@ -286,39 +350,52 @@ function renderEditor(todo: Todo): HTMLLIElement {
   description.maxLength = 4000;
   description.rows = 4;
 
+  const category = document.createElement("input");
+  category.value = todo.category ?? "";
+  category.placeholder = "Category";
+  category.maxLength = 100;
+
+  const priority = document.createElement("select");
+  for (const [value, label] of Object.entries(PRIORITY_LABELS)) {
+    priority.add(new Option(`${label} priority`, value, false, Number(value) === todo.priority));
+  }
+
   const save = document.createElement("button");
   save.type = "submit";
   save.textContent = "Save";
 
-  const cancel = document.createElement("button");
-  cancel.type = "button";
-  cancel.className = "secondary";
-  cancel.textContent = "Cancel";
-  cancel.onclick = () => {
-    editingId = null;
+  const cancel = actionButton("Cancel", "secondary", () => {
+    editing = null;
     render();
-  };
+  });
 
   form.onsubmit = (e) => {
     e.preventDefault();
     if (!title.value.trim()) return;
-    editingId = null;
-    void runTodoAction(() => updateTodo({ ...todo, title: title.value.trim(), description: description.value.trim() || null }));
+    editing = null;
+    void runTodoAction(() =>
+      updateTodo({
+        ...todo,
+        title: title.value.trim(),
+        description: description.value.trim() || null,
+        category: category.value.trim() || null,
+        priority: Number(priority.value) as Priority,
+      })
+    );
   };
 
-  form.append(title, description, save, cancel);
+  form.append(title, description, category, priority, save, cancel);
   li.appendChild(form);
-  queueMicrotask(() => description.focus());
+  queueMicrotask(() => title.focus());
   return li;
 }
 
 todoForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const title = titleInput.value.trim();
-  if (!title) return;
-
   const project = currentProject;
-  if (!project) return;
+  if (!title || !project) return;
+
   void runTodoAction(async () => {
     await createTodo({
       title,
@@ -336,6 +413,7 @@ todoForm.addEventListener("submit", (e) => {
 prevMonthBtn.addEventListener("click", () => shiftMonth(-1));
 nextMonthBtn.addEventListener("click", () => shiftMonth(1));
 todayBtn.addEventListener("click", () => selectDay(new Date()));
+allFilter.addEventListener("change", renderAll);
 
 filterBtn.addEventListener("click", () => void loadTodos());
 filterClearBtn.addEventListener("click", () => {
