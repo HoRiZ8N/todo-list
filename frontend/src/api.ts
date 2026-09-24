@@ -222,6 +222,14 @@ export async function banUser(id: string): Promise<void> {
   if (!res.ok) throw new Error((await res.text()) || "Failed to ban user");
 }
 
+export async function deleteUser(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/admin/users/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error((await res.text()) || "Failed to delete user");
+}
+
 export async function unbanUser(id: string): Promise<void> {
   const res = await fetch(`${API_BASE}/admin/users/${id}/unban`, {
     method: "POST",

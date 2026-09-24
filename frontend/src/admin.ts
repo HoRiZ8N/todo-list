@@ -1,5 +1,5 @@
 import type { AdminUser } from "./types.js";
-import { getUsers, banUser, unbanUser } from "./api.js";
+import { getUsers, banUser, unbanUser, deleteUser } from "./api.js";
 
 export function mountUsersPanel(container: HTMLElement, currentUserId: string | null): () => void {
   const panel = document.createElement("div");
@@ -55,7 +55,21 @@ export function mountUsersPanel(container: HTMLElement, currentUserId: string | 
           alert((e as Error).message);
         }
       };
-      actionTd.appendChild(btn);
+
+      const remove = document.createElement("button");
+      remove.textContent = "Delete";
+      remove.className = "delete-user";
+      remove.onclick = async () => {
+        if (!confirm(`Delete ${u.email}? Projects they own will be deleted with all their tasks.`)) return;
+        try {
+          await deleteUser(u.id);
+          void loadUsers();
+        } catch (e) {
+          alert((e as Error).message);
+        }
+      };
+
+      actionTd.append(btn, remove);
     }
   }
 

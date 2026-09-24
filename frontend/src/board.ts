@@ -407,7 +407,7 @@ function renderTodo(todo: Todo, scope: Scope): HTMLLIElement {
 
   const author = document.createElement("span");
   author.className = "todo-author";
-  author.textContent = todo.userId === currentUserId ? "created by you" : `created by ${todo.authorEmail}`;
+  author.textContent = todo.userId === currentUserId ? "created by you" : `created by ${todo.authorEmail || "deleted user"}`;
   meta.appendChild(author);
 
   info.appendChild(meta);
@@ -652,7 +652,7 @@ function renderProgressList(entries: ProgressEntry[]): HTMLUListElement {
 
     const author = document.createElement("span");
     author.className = "progress-author";
-    author.textContent = entry.authorId === currentUserId ? "You" : entry.authorEmail;
+    author.textContent = entry.authorId === currentUserId ? "You" : entry.authorEmail || "Deleted user";
     if (entry.authorId === currentProject?.ownerId) author.appendChild(badge("owner", "owner"));
 
     const date = document.createElement("span");

@@ -162,6 +162,15 @@ td button {
 td button.unban { background: #0f6e56; }
 td button.ban { background: #b3261e; }
 
+td button.delete-user {
+  margin-left: 6px;
+  background: transparent;
+  color: #b3261e;
+  border: 1px solid #b3261e;
+}
+
+td button.delete-user:hover { background: #fcebeb; }
+
 main { max-width: 640px; }
 
 .calendar {
