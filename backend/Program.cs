@@ -51,6 +51,13 @@ builder.Services.AddAuthentication(opt =>
 });
 
 builder.Services.AddScoped<JwtService>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
+builder.Services.AddScoped<TodoPermissions>();
+builder.Services.AddScoped<TodoService>();
+builder.Services.AddScoped<SubtaskService>();
+builder.Services.AddScoped<TodoProgressService>();
+builder.Services.AddScoped<ProjectService>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
