@@ -22,22 +22,30 @@ A simple web application for managing a task list. Backend in C# (ASP.NET Core),
 
 ## Architecture
 
-The backend is currently a thin layered API: controllers talk to EF Core directly through `AppDbContext`.
+The backend is a layered API. Task and project controllers only map HTTP to service calls; business rules live in services.
 
 ```
-TodosController  → AppDbContext → SQLite
-AuthController   → UserManager<AppUser> (ASP.NET Core Identity) → AppDbContext
-AdminController  → UserManager<AppUser> / AppDbContext
+TodosController    → TodoService / SubtaskService / TodoProgressService → TodoPermissions → AppDbContext → SQLite
+ProjectsController → ProjectService → AppDbContext / UserManager<AppUser>
+AuthController     → UserManager<AppUser> (ASP.NET Core Identity) → AppDbContext
+AdminController    → UserManager<AppUser> / AppDbContext
 ```
 
 - **ProjectsController** — team projects: create/rename/delete a project, add/remove members (owner only), leave a project (member)
 - **TodosController** — CRUD for tasks; personal tasks are visible only to their author, project tasks to every project member
 - **AuthController** — registration and login; issues JWTs
 - **AdminController** — user management for admins: list users, list all tasks, ban/unban a user, delete a user
+- **TodoService** — task CRUD, taking and releasing tasks
+- **SubtaskService** — adding, renaming, completing and deleting subtasks
+- **TodoProgressService** — task discussion messages
+- **ProjectService** — projects and their members
+- **TodoPermissions** — every task access rule in one place (access, add, edit, delete, work on, release)
+- **ICurrentUser / HttpCurrentUser** — the current user's id and admin flag, taken from the JWT claims
+- **Result / ServiceError** — services return a result or a typed error (`NotFound`, `Forbidden`, `Validation`, `Conflict`); `ApiControllerBase` maps errors to `404` / `403` / `400` / `409`
 - **JwtService** — builds and signs the JWT issued on login/registration
 - **AppDbContext** — `IdentityDbContext<AppUser>`, adds the `Todos`, `Projects` and `ProjectMembers` tables
 
-There is no separate service/repository layer at the moment — business rules (ownership checks, role checks) live directly in the controllers.
+Services work with `AppDbContext` directly; there is no separate repository layer. `AuthController` and `AdminController` are thin wrappers over ASP.NET Core Identity and still call `UserManager` themselves.
 
 The TypeScript frontend calls the API via `fetch` and updates the DOM without reloading the page. Navigation uses hash routes:
 
@@ -204,11 +212,20 @@ An admin cannot ban, unban or delete their own account (`BadRequest` is returned
 todo-list/
 ├── backend/
 │   ├── Controllers/
+│   │   ├── ApiControllerBase.cs   # maps service errors to HTTP responses
 │   │   ├── TodosController.cs
 │   │   ├── ProjectsController.cs
 │   │   ├── AuthController.cs
 │   │   └── AdminController.cs
 │   ├── Services/
+│   │   ├── TodoService.cs
+│   │   ├── SubtaskService.cs
+│   │   ├── TodoProgressService.cs
+│   │   ├── ProjectService.cs
+│   │   ├── TodoPermissions.cs
+│   │   ├── TodoProjections.cs     # EF Core projections to DTOs
+│   │   ├── CurrentUser.cs         # ICurrentUser, HttpCurrentUser
+│   │   ├── ServiceResult.cs       # Result, Result<T>, ServiceError
 │   │   ├── JwtService.cs
 │   │   └── AppIdentityErrorDescriber.cs
 │   ├── Models/
@@ -289,7 +306,7 @@ The backend will be available at `http://localhost:5001`, the frontend at `http:
 4. ~~Authentication and roles — Identity, JWT, User/Admin~~
 5. ~~Frontend (HTML/CSS/TS) — markup, styles, logic~~
 6. ~~Integration — fetch API, CRUD requests~~
-7. Service/repository layer — extract business logic out of the controllers
+7. ~~Service layer — extract business logic out of the controllers~~
 8. EF Core migrations — replace `EnsureCreated()` with versioned migrations
 9. Testing and deployment — verification, publishing
 
