@@ -131,7 +131,7 @@ Notes on roles and access:
 |------------------------------------------|---------------|----------------|
 | View project, members and tasks          | ✓             | ✓              |
 | Create tasks                             | ✓             | —              |
-| Edit / complete tasks                    | ✓             | —              |
+| Edit tasks (incl. deadline) / complete   | ✓             | —              |
 | Delete a task                            | any task      | own tasks only |
 | Rename / delete project                  | ✓             | —              |
 | Add / remove members                     | ✓             | —              |

@@ -577,6 +577,16 @@ li button.delete { background: #b3261e; }
 .todo-actions button { min-width: 64px; }
 
 .todo-editor select { flex: none; }
+
+.deadline-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #6b6a63;
+}
+
+.deadline-field input[type=date] { flex: none; padding: 6px 8px; font-size: 13px; }
 .todo-editor input:nth-of-type(2) { flex: 1 1 auto; }
 
 @media (max-width: 900px) {

@@ -727,6 +727,15 @@ function renderEditor(todo: Todo): HTMLLIElement {
     priority.add(new Option(`${label} priority`, value, false, Number(value) === todo.priority));
   }
 
+  const deadline = document.createElement("label");
+  deadline.className = "deadline-field";
+  deadline.textContent = "Deadline";
+  const dueDate = document.createElement("input");
+  dueDate.type = "date";
+  dueDate.required = true;
+  dueDate.value = todoKey(todo);
+  deadline.appendChild(dueDate);
+
   const save = document.createElement("button");
   save.type = "submit";
   save.textContent = "Save";
@@ -738,8 +747,14 @@ function renderEditor(todo: Todo): HTMLLIElement {
 
   form.onsubmit = (e) => {
     e.preventDefault();
-    if (!title.value.trim()) return;
+    if (!title.value.trim() || !dueDate.value) return;
     editing = null;
+    if (dueDate.value !== todoKey(todo)) {
+      const [year, month] = dueDate.value.split("-").map(Number);
+      selectedKey = dueDate.value;
+      viewYear = year;
+      viewMonth = month - 1;
+    }
     void runTodoAction(() =>
       updateTodo({
         ...todo,
@@ -747,11 +762,12 @@ function renderEditor(todo: Todo): HTMLLIElement {
         description: description.value.trim() || null,
         category: category.value.trim() || null,
         priority: Number(priority.value) as Priority,
+        dueDate: `${dueDate.value}T00:00:00`,
       })
     );
   };
 
-  form.append(title, description, category, priority, save, cancel);
+  form.append(title, description, category, priority, deadline, save, cancel);
   li.appendChild(form);
   queueMicrotask(() => title.focus());
   return li;
